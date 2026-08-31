@@ -1,8 +1,9 @@
 # Project Grapevine
 
-Project Grapevine is an open-source WebMCP reference implementation for
-permissioned coordination across human and machine sources. It contains two
-fictional demonstration workspaces:
+Project Grapevine is a disaster-response coordination workspace that lets an
+AI agent gather current evidence from people and sensors, turn a crisis resource
+directory into an actionable plan, and stop at explicit human approval before
+anything is dispatched. It contains two fictional demonstration workspaces:
 
 - Live Ground Truth: an agent coordinates with field responders and simulated
   infrastructure sensors around a western North Carolina relief corridor.
@@ -26,6 +27,28 @@ operating model behind it. Source verification, quality scoring, and machine
 responses are intentionally simplified for the demonstration.
 
 Live demo: <https://project-grapevine.preflyhq.com/>
+
+## Why WebMCP
+
+Disaster dashboards contain useful information, but an agent normally has to
+infer meaning from page layout and click through controls designed only for
+people. Grapevine exposes the same operational workflows as structured,
+page-scoped tools. The agent can discover available evidence, compare a stale
+baseline with current reports, shortlist appropriate response partners, and
+prepare the next action without guessing how the interface works.
+
+WebMCP also preserves the human role. Read-only tools gather and inspect
+evidence. Controlled tools prepare requests or plans, then the visible interface
+requires a person to authorize consequential steps. The result is collaboration,
+not autonomous dispatch:
+
+| Workspace | Agent contribution | Human responsibility |
+| --- | --- | --- |
+| Live Ground Truth | Finds people and sensors, reads the published baseline, and prepares a structured verification request | Authorizes the request, supplies field observations, and reviews source quality |
+| Resource Coordination | Finds relevant organizations, inspects evidence, builds a shortlist, and prepares a response plan | Reviews uncertainty, confirms current route evidence, and approves the plan |
+
+This project was created during The WebMCP Challenge submission period. Its
+initial public commit is dated August 31, 2026.
 
 ## Test the Live Site with WebMCP
 
@@ -174,6 +197,14 @@ transparent shortlist and stage a coordination request. No external partner is
 contacted. If route evidence is uncertain, the result directs the coordinator
 to Demo 1 for live field verification before dispatch.
 
+Both tool sets are registered directly with
+`document.modelContext.registerTool`. Zod schemas provide bounded JSON inputs,
+tool annotations distinguish read-only operations from controlled actions, and
+each execution returns structured data rather than scraped presentation text.
+React owns the visible approval states while the Cloudflare Worker and D1 retain
+the shared workflow state across the agent, operations dashboard, and field
+inbox.
+
 ## Current Build
 
 - React operations board at `/`
@@ -270,3 +301,6 @@ those files must remain uncommitted.
 ## License
 
 MIT
+
+The static corridor map includes in-image attribution to OpenStreetMap
+contributors and OpenMapTiles.
