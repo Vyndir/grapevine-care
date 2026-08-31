@@ -1,316 +1,92 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import type { CareState, PreparedAction } from "./schemas";
 
-type RegisteredTool = {
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-  annotations: {
-    readOnlyHint?: boolean;
-    untrustedContentHint?: boolean;
-  };
-  execute: (args: unknown) => Promise<unknown>;
-};
+type RegisteredTool = WebMCPTool;
 
-const spot = {
-  place_id: "demo-watauga-relief-corridor",
-  name: "Watauga Relief Corridor",
-  address: "Boone Staging Hub to Mountain Shelter B, Watauga County, NC",
-  baseline_status: "Regional route feed: passable",
-  baseline_detail: "Network update delayed; field verification required",
-  confidence: 0.62,
-  lat: 36.2168,
-  lng: -81.6746,
-  is_seeded: true,
-  as_of: new Date().toISOString()
-};
-
-const source = {
-  id: "src-boone-field",
-  handle: "boone-field-team",
-  trust_score: 0.91,
-  place_id: spot.place_id,
-  location_name: spot.name,
-  source_kind: "human" as const,
-  verification_label: "Field responder check-in",
-  lat: spot.lat,
-  lng: spot.lng,
-  offered: ["route_status", "supply_access", "hazard_report"],
-  online: true,
-  checked_in_at: new Date().toISOString(),
-  last_active: new Date().toISOString(),
-  distance_m: 0
-};
-
-const machineSource = {
-  ...source,
-  id: "src-creek-gauge",
-  handle: "demo-creek-gauge-7",
-  trust_score: 0.95,
-  source_kind: "system" as const,
-  verification_label: "Authenticated sensor feed (simulated)",
-  offered: ["flood_depth", "route_status", "hazard_report"]
-};
-
-const session = {
-  id: "ses-demo",
-  source_id: source.id,
-  requester_label: "Board user",
-  place_id: spot.place_id,
-  spot_name: spot.name,
-  request_type: "route_status",
-  question: "Can aid vehicles safely reach Mountain Shelter B from Boone?",
-  status: "pending_approval",
-  answer_value: null,
-  answer_note: null,
-  photo_url: null,
-  stars: null,
-  created_at: new Date().toISOString(),
-  answered_at: null,
-  source
-};
-
-const responsePartner = {
-  id: "partner-high-country",
-  name: "High Country Community Response",
-  organization_type: "local" as const,
-  summary: "Locally led distribution teams coordinating water and shelter supplies from Boone.",
-  capabilities: ["water", "shelter", "food"],
-  areas: ["Watauga Relief Corridor", "Watauga County"],
-  response_status: "active" as const,
-  verification_status: "confirmed" as const,
-  verification_note: "Simulated operations check-in confirmed at the Boone Staging Hub.",
-  contact_channel: "operations@highcountry.example",
-  local_led: true,
-  route_dependency: "Watauga Relief Corridor",
-  updated_at: new Date().toISOString()
-};
-
-const responseBundle = {
-  fictional: true as const,
-  incident: {
-    id: "helene-watauga-reference",
-    name: "Watauga County Relief Coordination",
-    area: "Watauga Relief Corridor",
-    operational_need: "Move water and temporary shelter supplies from Boone to Mountain Shelter B.",
-    published_status: "An earlier route update says the corridor is passable.",
-    uncertainty: "Current passability must be confirmed before dispatch.",
-    updated_at: new Date().toISOString()
-  },
-  partners: [responsePartner],
-  shortlists: [],
-  requests: [],
-  field_verification: null
+const baseState: CareState = {
+  fictional: true,
+  resident: { id: "rose-demo", display_name: "Rose", timezone: "America/New_York", simulated_time: "2026-08-31T08:14:00-04:00", scenario: "on_schedule", severity: "routine" },
+  doses: [
+    { id: "dose-am", resident_id: "rose-demo", label: "Morning dose", scheduled_time: "08:00", window_label: "7:30–9:00 AM", compartment: "M–AM", status: "ready", confirmed_at: null },
+    { id: "dose-noon", resident_id: "rose-demo", label: "Midday dose", scheduled_time: "12:00", window_label: "11:30 AM–1:00 PM", compartment: "M–NOON", status: "upcoming", confirmed_at: null },
+    { id: "dose-pm", resident_id: "rose-demo", label: "Evening dose", scheduled_time: "20:00", window_label: "7:30–9:00 PM", compartment: "M–PM", status: "upcoming", confirmed_at: null }
+  ],
+  devices: [
+    { id: "device-pillbox", resident_id: "rose-demo", name: "Care Station GC-01", device_type: "medication_dispenser", status: "online", battery_percent: 86, firmware: "1.0.0-demo", capabilities: ["schedule.read", "compartment.release.local_only"], door_state: "closed", last_seen: "2026-08-31T08:14:00-04:00" }
+  ],
+  inventory: { resident_id: "rose-demo", units_remaining: 24, daily_cadence: 3, updated_at: "2026-08-31T08:14:00-04:00" },
+  events: [{ id: "evt-1", resident_id: "rose-demo", event_type: "window_verified", severity: "routine", summary: "Morning window verified", detail: "All deterministic checks passed.", source: "Care Station GC-01", occurred_at: "2026-08-31T08:14:00-04:00" }],
+  actions: [],
+  safety_contract: { ai_may: ["Read evidence"], ai_may_not: ["Release medication", "Diagnose", "Contact emergency services"], emergency_notice: "Contact local emergency services in an emergency." }
 };
 
 function installModelContext() {
   const tools = new Map<string, RegisteredTool>();
-  const modelContext = {
-    async registerTool(
-      tool: RegisteredTool,
-      options: { signal?: AbortSignal } = {}
-    ) {
-      tools.set(tool.name, tool);
-      options.signal?.addEventListener("abort", () => {
-        if (tools.get(tool.name) === tool) tools.delete(tool.name);
-      });
-    }
-  };
-
-  Object.defineProperty(document, "modelContext", {
-    configurable: true,
-    value: modelContext
-  });
-
+  Object.defineProperty(document, "modelContext", { configurable: true, value: { async registerTool(tool: RegisteredTool, options: { signal?: AbortSignal } = {}) { tools.set(tool.name, tool); options.signal?.addEventListener("abort", () => { if (tools.get(tool.name) === tool) tools.delete(tool.name); }); } } });
   return tools;
 }
 
 function installFetch() {
+  let state = structuredClone(baseState);
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    const body = init?.body ? JSON.parse(String(init.body)) : {};
-
-    if (url === "/api/state") {
-      return Response.json({ spots: [spot], sources: [source, machineSource], sessions: [] });
+    const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+    if (url.startsWith("/api/care/state")) return Response.json(state);
+    if (url === "/api/care/scenario") {
+      if (body.scenario === "missed_window") state = { ...state, resident: { ...state.resident, scenario: "missed_window", severity: "attention" }, doses: state.doses.map((dose, index) => index === 0 ? { ...dose, status: "missed" } : dose), events: [{ ...state.events[0], id: "evt-missed", severity: "attention", summary: "Medication window elapsed" }, ...state.events] };
+      return Response.json({ state });
     }
-    if (url === "/api/baseline") return Response.json(spot);
-    if (url === "/api/sources/find") {
-      return Response.json({ spot, sources: [source, machineSource], radius_m: body.radius_m });
+    if (url === "/api/care/actions") {
+      const action: PreparedAction = { id: "action-1", resident_id: "rose-demo", channel: body.channel as PreparedAction["channel"], reason: String(body.reason), status: "awaiting_human_approval", idempotency_key: String(body.idempotency_key), created_at: state.resident.simulated_time, resolved_at: null };
+      state = { ...state, actions: [action] };
+      return Response.json({ action, approval_required: true, external_side_effect: false });
     }
-    if (url === "/api/sessions") return Response.json({ session });
-    if (url === "/api/sessions/ses-demo/approve") {
-      return Response.json({ session: { ...session, status: "sent" } });
-    }
-    if (url === "/api/sessions/ses-demo/rate") {
-      return Response.json({
-        session: { ...session, status: "rated", stars: body.stars }
-      });
-    }
-    if (url === "/api/driver?source_id=src-boone-field") {
-      return Response.json({ source, sessions: [{ ...session, status: "sent" }] });
-    }
-    if (url === "/api/drive/check-in") {
-      return Response.json({ source: { ...source, id: "src-boone-field" } });
-    }
-    return Response.json({ session }, { status: 200 });
+    if (url.includes("/resolve")) { state = { ...state, actions: state.actions.map((action) => ({ ...action, status: "dismissed" })) }; return Response.json({ state, external_side_effect: false }); }
+    if (url.includes("/confirm")) { state = { ...state, doses: state.doses.map((dose, index) => index === 0 ? { ...dose, status: "confirmed" } : dose), inventory: { ...state.inventory, units_remaining: 23 } }; return Response.json({ state }); }
+    return Response.json({ error: "Not found" }, { status: 404 });
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
 
-function installResponseFetch() {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
-    const body = init?.body ? JSON.parse(String(init.body)) : {};
-    if (url === "/api/response/state") return Response.json(responseBundle);
-    if (url === "/api/response/incident") return Response.json(responseBundle.incident);
-    if (url === "/api/response/partners/find") return Response.json({ partners: [responsePartner], matching_need: body.need, area: body.area });
-    if (url === "/api/response/partners/partner-high-country") return Response.json(responsePartner);
-    if (url === "/api/response/shortlists") return Response.json({ shortlist: { id: "shortlist-1", ...body, created_at: new Date().toISOString(), partners: [responsePartner] } });
-    if (url === "/api/response/requests") return Response.json({ request: { id: "coord-1", ...body, status: "pending_approval", field_verification_required: true, uncertainty: responseBundle.incident.uncertainty, created_at: new Date().toISOString(), approved_at: null }, approval_required: true, recommended_next_step: { page: "/", tool: "find_available_sources" } });
-    return Response.json(responseBundle);
-  });
-  vi.stubGlobal("fetch", fetchMock);
-  return fetchMock;
-}
+beforeEach(() => { vi.restoreAllMocks(); installFetch(); });
 
-beforeEach(() => {
-  vi.restoreAllMocks();
-  localStorage.clear();
-  Object.defineProperty(window, "location", {
-    configurable: true,
-    value: new URL("https://example.test/")
-  });
-});
-
-describe("Grapevine board", () => {
-  it("loads the seeded baseline and source picker", async () => {
-    installFetch();
-    render(<App />);
-
-    expect(await screen.findByRole("heading", { name: "Watauga Relief Corridor" })).toBeInTheDocument();
-    expect(await screen.findByDisplayValue("Watauga Relief Corridor")).toBeInTheDocument();
-    expect(await screen.findByText("Boone field team")).toBeInTheDocument();
-    expect(screen.getByText("Creek depth sensor")).toBeInTheDocument();
-    expect(screen.getByText("Earlier update says the route was open")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Field inbox" })).toHaveAttribute("href", "/drive");
-    expect(screen.queryByText(/payment/i)).not.toBeInTheDocument();
-  });
-
-  it("creates an approval-gated request by hand", async () => {
-    installFetch();
-    render(<App />);
-
-    await screen.findByText("Boone field team");
-    fireEvent.click(screen.getAllByRole("button", { name: "Request" })[0]);
-    fireEvent.click(screen.getByRole("button", { name: "Prepare question" }));
-
-    expect(await screen.findByText("pending approval")).toBeInTheDocument();
-    expect(screen.getByText("Send question")).toBeInTheDocument();
-  });
-});
-
-describe("Grapevine routing", () => {
-  it("shows a neutral page with no site tools for unknown routes", () => {
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: new URL("https://example.test/retired-demo")
-    });
+describe("Grapevine Care", () => {
+  it("presents a large-touch resident flow and registers six bounded tools", async () => {
     const tools = installModelContext();
     render(<App />);
-
-    expect(screen.getByRole("heading", { name: "Page not found" })).toBeInTheDocument();
-    expect(tools.size).toBe(0);
+    expect(await screen.findByRole("heading", { name: "Good morning, Rose." })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Hold to verify/i })).toBeEnabled();
+    await waitFor(() => expect(tools.size).toBe(6));
+    expect([...tools.keys()].sort()).toEqual(["get_care_evidence", "get_care_overview", "get_device_capabilities", "get_inventory_forecast", "get_medication_schedule", "prepare_caregiver_check_in"]);
   });
-});
 
-describe("Grapevine field inbox", () => {
-  it("keeps the human responder view inside the shared demo navigation", async () => {
-    Object.defineProperty(window, "location", { configurable: true, value: new URL("https://example.test/drive") });
-    localStorage.setItem("grapevine.logistics_source_id", "src-boone-field");
-    installFetch();
+  it("shows explicit uncertainty after the missed-window scenario", async () => {
     render(<App />);
-
-    expect(await screen.findByRole("heading", { name: "Field Inbox" })).toBeInTheDocument();
-    expect(screen.getByText("Human responder")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Operations" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "Partner directory" })).toHaveAttribute("href", "/response");
-    expect(screen.queryByText(/sensor registration/i)).not.toBeInTheDocument();
+    await screen.findByText("Good morning, Rose.");
+    fireEvent.click(screen.getByRole("button", { name: "Missed window" }));
+    fireEvent.click(screen.getByRole("button", { name: "Caregiver" }));
+    expect(await screen.findByRole("heading", { name: "Rose’s care routine needs attention" })).toBeInTheDocument();
+    expect(screen.getByText(/ingestion and welfare remain unknown/i)).toBeInTheDocument();
   });
-});
 
-describe("Grapevine WebMCP tools", () => {
-  it("registers the five required tools", async () => {
-    installFetch();
+  it("stages agent outreach and stops at human review", async () => {
     const tools = installModelContext();
     render(<App />);
-
-    await waitFor(() => expect(tools.size).toBe(5));
-    expect([...tools.keys()].sort()).toEqual([
-      "ask_source",
-      "find_available_sources",
-      "get_response",
-      "get_web_baseline",
-      "rate_response"
-    ]);
+    await waitFor(() => expect(tools.size).toBe(6));
+    await act(async () => { await tools.get("prepare_caregiver_check_in")!.execute({ resident_id: "rose-demo", channel: "call", reason: "The missed confirmation needs caregiver review.", idempotency_key: "test-action-001" }); });
+    expect(await screen.findByRole("dialog", { name: "Review caregiver check-in" })).toBeInTheDocument();
+    expect(screen.getByText("No one has been contacted")).toBeInTheDocument();
   });
 
-  it("routes tool calls through the Grapevine API actions", async () => {
-    installFetch();
-    const tools = installModelContext();
+  it("makes device capability boundaries visible", async () => {
     render(<App />);
-    await waitFor(() => expect(tools.size).toBe(5));
-
-    const found = (await tools.get("find_available_sources")!.execute({
-      near: "Watauga Relief Corridor"
-    })) as { sources: Array<{ id: string }> };
-    expect(found.sources[0].id).toBe("src-boone-field");
-
-    let created!: { id: string; status: string };
-    await act(async () => {
-      created = (await tools.get("ask_source")!.execute({
-        source_id: "src-boone-field",
-        request_type: "route_status",
-        question: "Can the aid convoy pass?"
-      })) as { id: string; status: string };
-    });
-    expect(created.status).toBe("pending_approval");
-  });
-});
-
-describe("Grapevine resource coordination", () => {
-  it("presents the partner workflow and registers only its five WebMCP tools", async () => {
-    Object.defineProperty(window, "location", { configurable: true, value: new URL("https://example.test/response") });
-    installResponseFetch();
-    const tools = installModelContext();
-    render(<App />);
-
-    expect(await screen.findByRole("heading", { name: "Resource Coordination" })).toBeInTheDocument();
-    expect(await screen.findByText("High Country Community Response")).toBeInTheDocument();
-    await waitFor(() => expect(tools.size).toBe(5));
-    expect([...tools.keys()].sort()).toEqual([
-      "create_response_shortlist",
-      "find_response_partners",
-      "get_crisis_brief",
-      "get_partner_details",
-      "prepare_coordination_request"
-    ]);
-    expect(tools.has("find_available_sources")).toBe(false);
-  });
-
-  it("returns a field-verification handoff after staging coordination", async () => {
-    Object.defineProperty(window, "location", { configurable: true, value: new URL("https://example.test/response") });
-    installResponseFetch();
-    const tools = installModelContext();
-    render(<App />);
-    await waitFor(() => expect(tools.size).toBe(5));
-
-    const result = await tools.get("prepare_coordination_request")!.execute({
-      shortlist_id: "shortlist-1",
-      objective: "Move water to Mountain Shelter B.",
-      available_resources: "Two truckloads of bottled water."
-    }) as { recommended_next_step: { tool: string } };
-    expect(result.recommended_next_step.tool).toBe("find_available_sources");
+    await screen.findByText("Good morning, Rose.");
+    fireEvent.click(screen.getByRole("button", { name: "Devices & MCP" }));
+    expect(screen.getByRole("heading", { name: "A safe control plane for connected care" })).toBeInTheDocument();
+    expect(screen.getByText("compartment.release.local_only")).toBeInTheDocument();
+    expect(screen.getByText("Release medication")).toBeInTheDocument();
   });
 });

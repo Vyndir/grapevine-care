@@ -2,189 +2,57 @@ import * as z from "zod/mini";
 
 z.config(z.locales.en());
 
-export const requestTypes = [
-  "route_status",
-  "flood_depth",
-  "supply_access",
-  "hazard_report",
-  "custom"
-] as const;
+export const residentIdSchema = z.string().check(z.trim(), z.minLength(1), z.maxLength(64));
+export const scenarioSchema = z.enum(["on_schedule", "missed_window", "door_fault", "device_offline"]);
 
-export const answerOptions = {
-  route_status: ["passable", "caution", "blocked", "unknown"],
-  flood_depth: ["clear", "under 6 in", "6-12 in", "over 12 in"],
-  supply_access: ["accessible", "limited", "inaccessible", "unknown"],
-  hazard_report: ["none", "debris", "downed lines", "flooding"],
-  custom: ["yes", "no", "unclear"]
-} as const;
-
-export const nearSchema = z
-  .string()
-  .check(z.trim(), z.minLength(1, "An operational area is required."));
-
-export const spotSchema = z
-  .string()
-  .check(z.trim(), z.minLength(1, "An operational area is required."));
-
-export const sourceIdSchema = z
-  .string()
-  .check(z.trim(), z.minLength(1, "A source ID is required."));
-
-export const sessionIdSchema = z
-  .string()
-  .check(z.trim(), z.minLength(1, "A session ID is required."));
-
-export const findAvailableSourcesArgsSchema = z.object({
-  near: nearSchema.check(
-    z.describe("An operational area, route, facility, or incident site.")
-  ),
-  radius_m: z.optional(
-    z
-      .number()
-      .check(
-        z.minimum(50),
-        z.maximum(10000),
-        z.describe("Search radius in meters. Defaults to 1500.")
-      )
-  )
+export const getCareOverviewArgsSchema = z.object({
+  resident_id: residentIdSchema.check(z.describe("Resident identifier shown by the care workspace. Use rose-demo for this fictional demo."))
 });
-
-export const getWebBaselineArgsSchema = z.object({
-  spot: spotSchema.check(z.describe("The operational area whose baseline should be read."))
+export const getMedicationScheduleArgsSchema = z.object({
+  resident_id: residentIdSchema,
+  horizon: z.optional(z.enum(["today", "48_hours"]).check(z.describe("Schedule horizon. Defaults to today.")))
 });
-
-export const askSourceArgsSchema = z.object({
-  source_id: sourceIdSchema.check(
-    z.describe("The source ID returned by find_available_sources.")
-  ),
-  request_type: z.enum(requestTypes).check(
-    z.describe(
-      "One of route_status, flood_depth, supply_access, hazard_report, or custom."
-    )
-  ),
-  question: z.optional(
-    z
-      .string()
-      .check(
-        z.trim(),
-        z.maxLength(240, "Questions must be 240 characters or fewer."),
-        z.describe("Optional human-readable question for the source.")
-      )
-  )
+export const getInventoryForecastArgsSchema = z.object({
+  resident_id: residentIdSchema,
+  threshold_days: z.optional(z.number().check(z.minimum(1), z.maximum(30), z.describe("Caregiver reminder threshold in days, from 1 through 30. Defaults to 10.")))
 });
-
-export const getResponseArgsSchema = z.object({
-  session_id: sessionIdSchema.check(
-    z.describe("The session ID returned by ask_source.")
-  )
+export const getDeviceCapabilitiesArgsSchema = z.object({
+  resident_id: residentIdSchema,
+  device_type: z.optional(z.enum(["medication_dispenser", "fall_sensor", "blood_pressure_cuff"]).check(z.describe("Optional device category to filter. Omit to return every registered device.")))
 });
-
-export const rateResponseArgsSchema = z.object({
-  session_id: sessionIdSchema.check(
-    z.describe("The answered session ID to rate.")
-  ),
-  stars: z
-    .number()
-    .check(
-      z.minimum(1),
-      z.maximum(5),
-      z.describe("Whole-star rating from 1 to 5.")
-    )
+export const getCareEvidenceArgsSchema = z.object({
+  resident_id: residentIdSchema,
+  event_limit: z.optional(z.number().check(z.minimum(1), z.maximum(20), z.describe("Maximum evidence events to return. Defaults to 8.")))
+});
+export const prepareCaregiverCheckInArgsSchema = z.object({
+  resident_id: residentIdSchema,
+  channel: z.enum(["call", "visit", "message"]).check(z.describe("Proposed caregiver check-in channel. This is staged only and is never sent automatically.")),
+  reason: z.string().check(z.trim(), z.minLength(8), z.maxLength(240), z.describe("Concise evidence-based reason for a caregiver to review.")),
+  idempotency_key: z.string().check(z.trim(), z.minLength(8), z.maxLength(80), z.describe("Unique caller-generated key that prevents duplicate staged actions."))
 });
 
 export const toolInputSchemas = {
-  findAvailableSources: z.toJSONSchema(findAvailableSourcesArgsSchema, {
-    target: "draft-07",
-    io: "input"
-  }),
-  getWebBaseline: z.toJSONSchema(getWebBaselineArgsSchema, {
-    target: "draft-07",
-    io: "input"
-  }),
-  askSource: z.toJSONSchema(askSourceArgsSchema, {
-    target: "draft-07",
-    io: "input"
-  }),
-  getResponse: z.toJSONSchema(getResponseArgsSchema, {
-    target: "draft-07",
-    io: "input"
-  }),
-  rateResponse: z.toJSONSchema(rateResponseArgsSchema, {
-    target: "draft-07",
-    io: "input"
-  })
+  getCareOverview: z.toJSONSchema(getCareOverviewArgsSchema, { target: "draft-07", io: "input" }),
+  getMedicationSchedule: z.toJSONSchema(getMedicationScheduleArgsSchema, { target: "draft-07", io: "input" }),
+  getInventoryForecast: z.toJSONSchema(getInventoryForecastArgsSchema, { target: "draft-07", io: "input" }),
+  getDeviceCapabilities: z.toJSONSchema(getDeviceCapabilitiesArgsSchema, { target: "draft-07", io: "input" }),
+  getCareEvidence: z.toJSONSchema(getCareEvidenceArgsSchema, { target: "draft-07", io: "input" }),
+  prepareCaregiverCheckIn: z.toJSONSchema(prepareCaregiverCheckInArgsSchema, { target: "draft-07", io: "input" })
 } as const;
 
-export type RequestType = (typeof requestTypes)[number];
-export type AnswerValue = (typeof answerOptions)[RequestType][number];
-
-export type Spot = {
-  place_id: string;
-  name: string;
-  address: string;
-  baseline_status: string;
-  baseline_detail: string;
-  confidence: number;
-  lat: number;
-  lng: number;
-  is_seeded: boolean;
-  as_of?: string;
-};
-
-export type Source = {
-  id: string;
-  handle: string;
-  trust_score: number;
-  place_id: string;
-  location_name: string;
-  source_kind: "human" | "system";
-  verification_label: string;
-  lat: number;
-  lng: number;
-  offered: RequestType[];
-  online: boolean;
-  checked_in_at: string;
-  last_active: string;
-  distance_m?: number;
-};
-
-export type SessionStatus =
-  | "pending_approval"
-  | "sent"
-  | "answered"
-  | "rated";
-
-export type Session = {
-  id: string;
-  source_id: string;
-  requester_label: string;
-  place_id: string;
-  spot_name: string;
-  request_type: RequestType;
-  question: string;
-  status: SessionStatus;
-  answer_value: string | null;
-  answer_note: string | null;
-  photo_url: string | null;
-  stars: number | null;
-  created_at: string;
-  answered_at: string | null;
-  source?: Source;
-};
-
-export type AppState = {
-  spots: Spot[];
-  sources: Source[];
-  sessions: Session[];
-};
-
-export function parseArgs<Schema extends z.ZodMiniType>(
-  schema: Schema,
-  input: unknown
-): z.output<Schema> {
+export function parseArgs<Schema extends z.ZodMiniType>(schema: Schema, input: unknown): z.output<Schema> {
   const result = schema.safeParse(input);
-  if (!result.success) {
-    throw new Error(z.prettifyError(result.error));
-  }
+  if (!result.success) throw new Error(z.prettifyError(result.error));
   return result.data;
 }
+
+export type Scenario = z.output<typeof scenarioSchema>;
+export type DoseStatus = "ready" | "upcoming" | "confirmed" | "missed" | "blocked";
+export type CareSeverity = "routine" | "attention" | "urgent";
+export type Resident = { id: string; display_name: string; timezone: string; simulated_time: string; scenario: Scenario; severity: CareSeverity; };
+export type Dose = { id: string; resident_id: string; label: string; scheduled_time: string; window_label: string; compartment: string; status: DoseStatus; confirmed_at: string | null; };
+export type CareDevice = { id: string; resident_id: string; name: string; device_type: "medication_dispenser" | "fall_sensor" | "blood_pressure_cuff"; status: "online" | "offline" | "attention"; battery_percent: number; firmware: string; capabilities: string[]; door_state: "closed" | "open" | "not_applicable"; last_seen: string; };
+export type Inventory = { resident_id: string; units_remaining: number; daily_cadence: number; updated_at: string; };
+export type CareEvent = { id: string; resident_id: string; event_type: string; severity: CareSeverity; summary: string; detail: string; source: string; occurred_at: string; };
+export type PreparedAction = { id: string; resident_id: string; channel: "call" | "visit" | "message"; reason: string; status: "awaiting_human_approval" | "approved_in_demo" | "dismissed"; idempotency_key: string; created_at: string; resolved_at: string | null; };
+export type CareState = { fictional: true; resident: Resident; doses: Dose[]; devices: CareDevice[]; inventory: Inventory; events: CareEvent[]; actions: PreparedAction[]; safety_contract: { ai_may: string[]; ai_may_not: string[]; emergency_notice: string; }; };

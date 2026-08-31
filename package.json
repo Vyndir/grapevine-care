@@ -1,11 +1,11 @@
 {
-  "name": "grapevine-webmcp",
+  "name": "grapevine-care-webmcp",
   "version": "0.1.0",
-  "description": "Project Grapevine, a western North Carolina aid-logistics reference using WebMCP.",
+  "description": "Grapevine Care, a safety-first elder medication support simulation using WebMCP.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/samueltate/project-grapevine.git"
   },
   "homepage": "",
   "keywords": [
@@ -29,6 +29,7 @@
   "type": "module",
   "scripts": {
     "start": "vite dev",
+    "db:local": "wrangler d1 execute grapevine-care --local --file drizzle/0001_grapevine_care.sql",
     "build": "vite build",
     "deploy": "vite build && wrangler deploy",
     "audit:public": "node scripts/audit-public.mjs",
@@ -44,6 +45,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.48.0",
     "@cloudflare/workers-types": "^5.20260729.1",
+    "@openai/sites-vite-plugin": "0.2.0",
     "@tailwindcss/vite": "^4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",

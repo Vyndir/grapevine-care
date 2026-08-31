@@ -1,306 +1,124 @@
-# Project Grapevine
+# Grapevine Care
 
-Project Grapevine is a disaster-response coordination workspace that lets an
-AI agent gather current evidence from people and sensors, turn a crisis resource
-directory into an actionable plan, and stop at explicit human approval before
-anything is dispatched. It contains two fictional demonstration workspaces:
+Grapevine Care is a safety-first WebMCP prototype showing how an AI agent, a
+caregiver, and a connected medication dispenser could share structured evidence
+without handing medical or emergency decisions to the agent.
 
-- Live Ground Truth: an agent coordinates with field responders and simulated
-  infrastructure sensors around a western North Carolina relief corridor.
-- Resource Coordination: an internal relief coordinator uses a structured
-  partner directory to turn an operational need into a reviewable response plan.
+The experience has three coordinated surfaces:
 
-The demo is a fictional Hurricane Helene response simulation inspired by the
-aid-distribution and access challenges experienced across western North
-Carolina. A relief operations team must decide whether vehicles can travel from
-a Boone staging hub to a simulated mountain shelter through the Watauga Relief
-Corridor. A delayed regional baseline says the route is passable, while live
-human observations or simulated machine telemetry can report changing
-conditions.
+- **Rose’s station** gives an older adult a calm, large-touch medication-window
+  experience. A simulated local biometric attestation can confirm the currently
+  eligible compartment.
+- **Caregiver workspace** separates device evidence from interpretation, shows
+  uncertainty explicitly, forecasts inventory, and requires a person to review
+  any staged check-in.
+- **Devices & WebMCP** makes the tool contract, device capabilities, provenance,
+  and non-negotiable safety boundaries visible.
 
-All routes, shelters, responders, readings, partner organizations, contact
-channels, and operational conditions are fictional. They do not represent
-current emergency or travel guidance.
+Every resident, medication window, device, caregiver, event, and timestamp is
+fictional. This is a competition demonstration—not a medical device, clinical
+decision-support system, adherence guarantee, emergency service, or substitute
+for professional care.
 
-This repository is a technical reference, not the commercial product or
-operating model behind it. Source verification, quality scoring, and machine
-responses are intentionally simplified for the demonstration.
+## WebMCP collaboration model
 
-Live demo: <https://project-grapevine.preflyhq.com/>
+Grapevine Care registers six page-scoped tools directly with
+`document.modelContext.registerTool(...)`:
 
-## Why WebMCP
-
-Disaster dashboards contain useful information, but an agent normally has to
-infer meaning from page layout and click through controls designed only for
-people. Grapevine exposes the same operational workflows as structured,
-page-scoped tools. The agent can discover available evidence, compare a stale
-baseline with current reports, shortlist appropriate response partners, and
-prepare the next action without guessing how the interface works.
-
-WebMCP also preserves the human role. Read-only tools gather and inspect
-evidence. Controlled tools prepare requests or plans, then the visible interface
-requires a person to authorize consequential steps. The result is collaboration,
-not autonomous dispatch:
-
-| Workspace | Agent contribution | Human responsibility |
+| Tool | Agent contribution | Boundary |
 | --- | --- | --- |
-| Live Ground Truth | Finds people and sensors, reads the published baseline, and prepares a structured verification request | Authorizes the request, supplies field observations, and reviews source quality |
-| Resource Coordination | Finds relevant organizations, inspects evidence, builds a shortlist, and prepares a response plan | Reviews uncertainty, confirms current route evidence, and approves the plan |
+| `get_care_overview` | Reads current status, active window, and device health | Read only |
+| `get_medication_schedule` | Reads fictional medication windows and confirmation states | Cannot change the plan or release medication |
+| `get_inventory_forecast` | Calculates days remaining from units and daily cadence | Cannot order or request a prescription |
+| `get_device_capabilities` | Discovers least-privilege capabilities across device adapters | No agent-facing release or biometric capability |
+| `get_care_evidence` | Reads a bounded event trail with source and uncertainty | Device data is marked untrusted |
+| `prepare_caregiver_check_in` | Stages a call, visit, or message for review | No one is contacted until a person approves; the demo has no external messaging integration |
 
-This project was created during The WebMCP Challenge submission period. Its
-initial public commit is dated August 31, 2026.
+The deterministic device controller—not the AI—enforces schedule windows,
+duplicate-release prevention, door state, and local confirmation. The AI cannot
+prescribe, alter a dose, release a compartment, impersonate a fingerprint,
+diagnose, determine that an emergency exists, or contact emergency services.
 
-## Test the Live Site with WebMCP
+## Judge demo
 
-Use the ChatGPT desktop app's built-in browser. Site tools are tied to the page
-that provides them, so keep the relevant Grapevine page open while running each
-scenario. The operations page and partner directory each expose five tools. The
-field inbox intentionally exposes no WebMCP tools because it is the human
-response surface.
+1. Open the deployed site in ChatGPT’s in-app browser and allow site tools.
+2. In the **Judge demo** bar, select **Missed window**.
+3. Ask ChatGPT:
 
-Requirements:
+   > Use only this page’s WebMCP tools. Review Rose’s current care overview,
+   > medication schedule, recent evidence, inventory forecast, and connected
+   > device capabilities. Explain what is known and what remains uncertain.
+   > If a caregiver check-in is justified, prepare a call using the
+   > idempotency key `judge-missed-window-call-01`. Do not claim anyone has
+   > been contacted, do not diagnose, and stop for human approval.
 
-1. Open the built-in browser in the ChatGPT desktop app.
-2. Visit <https://project-grapevine.preflyhq.com/>.
-3. Approve access to the site if prompted.
-4. Check the site-tools control in the address bar. The operations page should
-   show five available tools.
+4. ChatGPT should call the five read-only tools and then
+   `prepare_caregiver_check_in`.
+5. The visible review drawer opens. Confirm that it states **No one has been
+   contacted**, then approve or dismiss the simulated action.
+6. Switch to **Devices & MCP** to show the extensible adapter model and tool
+   boundaries. Use the reset control to return to the deterministic starting
+   state.
 
-Site-tool availability depends on the tester's ChatGPT account and selected
-model. See OpenAI's [site tools documentation](https://help.openai.com/en/articles/20001423-using-site-tools-in-the-chatgpt-desktop-app).
+## Competition alignment
 
-### Scenario 1: Verify Conditions with a Machine Source
+This project is designed for the OpenAI WebMCP Challenge:
 
-Open <https://project-grapevine.preflyhq.com/> and send:
+- It is a working web application with imperative WebMCP tools and JSON Schema
+  inputs.
+- The human and agent operate in the same visible interface.
+- Five tools are read-only; the only state-changing tool stages a reversible,
+  approval-gated action with an idempotency key.
+- Tool outputs contain source, observation time, calculation details, and
+  explicit uncertainty.
+- The demo has deterministic scenarios and a one-click reset for reliable
+  judging.
+- The public source includes setup instructions and an MIT license.
 
-> Use only the WebMCP tools provided by this page. Read the published baseline
-> for the Watauga Relief Corridor, find available sources within 5 km, and use
-> the road conditions camera to prepare a hazard-report question about the aid
-> route. Stop when human approval is required.
+See [Submission notes](docs/SUBMISSION.md), [Demo script](docs/DEMO_SCRIPT.md),
+[Architecture](docs/ARCHITECTURE.md), and [Safety case](docs/SAFETY.md).
 
-Expected flow:
+## Architecture
 
-1. ChatGPT calls `get_web_baseline` and `find_available_sources`.
-2. ChatGPT calls `ask_source` for the simulated road camera.
-3. The request drawer opens. Select **Send question**.
-4. Send this follow-up:
-
-> Retrieve the structured response, summarize its operational impact, and rate
-> the response four stars.
-
-ChatGPT should call `get_response` and `rate_response`. This exercises all five
-Demo 1 tools without requiring a second device.
-
-### Scenario 1B: Verify Conditions with a Human Source
-
-This optional version uses a phone or second browser window.
-
-1. On the second device, open
-   <https://project-grapevine.preflyhq.com/drive>.
-2. Use call sign `boone-field-team`, keep the operational area as
-   `Watauga Relief Corridor`, and select **Go online**.
-3. On the operations page in ChatGPT, send:
-
-> Use this page's WebMCP tools to find the Boone field team and prepare a
-> route-status question asking whether relief vehicles can safely reach
-> Mountain Shelter B. Stop for approval.
-
-4. Select **Send question** in the request drawer.
-5. On the field device, choose a structured answer, add a short simulated
-   observation, and submit it.
-6. In ChatGPT, send:
-
-> Retrieve the field response and explain whether dispatch should proceed.
-
-This demonstrates the same WebMCP contract coordinating with a live human
-instead of a deterministic sensor.
-
-### Scenario 2: Turn a Resource Directory into a Response Plan
-
-Open <https://project-grapevine.preflyhq.com/response> and send:
-
-> Use only the WebMCP tools provided by this page. Read the crisis brief. We
-> have two truckloads of bottled water and 40 temporary shelter kits at the
-> Boone Staging Hub. Find up to two active partners serving the Watauga Relief
-> Corridor for water, favor locally led organizations, inspect the evidence for
-> each match, save a transparent shortlist, and prepare a coordination request.
-> Do not claim that anyone has been contacted or that dispatch is approved.
-> Tell me what remains uncertain.
-
-Expected flow:
-
-1. ChatGPT calls `get_crisis_brief`, `find_response_partners`, and
-   `get_partner_details`.
-2. ChatGPT calls `create_response_shortlist` and
-   `prepare_coordination_request`.
-3. The response plan shows the selected partners, but dispatch remains locked
-   until a current route report is available.
-
-To test the cross-demo handoff, continue with:
-
-> Follow the recommended handoff to Live Ground Truth. Find the Boone field
-> team and prepare a route-status question asking whether aid vehicles can
-> safely reach Mountain Shelter B. Stop for approval.
-
-Approve the question, answer `passable` from the field inbox, and ask ChatGPT to
-retrieve the response and return to the partner directory. The plan should show
-the field evidence and unlock the final human-controlled **Approve plan**
-button. A `caution` or `blocked` report should keep approval locked.
-
-### Troubleshooting Site Tools
-
-- Use the ChatGPT desktop app's built-in browser, not Chrome or a normal browser.
-- Keep the relevant page open; tools do not carry from `/response` to `/` or
-  `/drive`.
-- In ChatGPT Browser settings, open **Permissions** and confirm site tools are
-  enabled and `project-grapevine.preflyhq.com` is allowed.
-- Reload the page after changing permissions.
-- If no site-tools control appears, the tester's account or selected model may
-  not currently support site tools. The visual demo will still work, but the
-  WebMCP scenarios require site-tool access.
-
-## Aid Logistics Flow
-
-1. An AI agent reads the published operational baseline.
-2. The agent discovers available human and machine sources.
-3. The agent prepares a structured verification request.
-4. A user reviews and authorizes the request.
-5. The selected source returns a structured response with optional context.
-6. The requester reviews the response and records a source-quality rating.
-
-## Route-Specific WebMCP Tools
-
-The Aid Logistics board at `/` registers five tools:
-
-- `find_available_sources`
-- `get_web_baseline`
-- `ask_source`
-- `get_response`
-- `rate_response`
-
-The same tools work for both source channels. Human requests are delivered to
-the human-only field view at `/drive`. Two seeded machine sources, a creek-depth
-gauge and roadside conditions camera, return deterministic, clearly labeled
-simulated telemetry after authorization. A field responder cannot register a
-phone as an infrastructure sensor.
-
-The Resource Coordination workspace at `/response` registers five separate tools:
-
-- `get_crisis_brief`
-- `find_response_partners`
-- `get_partner_details`
-- `create_response_shortlist`
-- `prepare_coordination_request`
-
-The first three tools read structured directory evidence. The final two save a
-transparent shortlist and stage a coordination request. No external partner is
-contacted. If route evidence is uncertain, the result directs the coordinator
-to Demo 1 for live field verification before dispatch.
-
-Both tool sets are registered directly with
-`document.modelContext.registerTool`. Zod schemas provide bounded JSON inputs,
-tool annotations distinguish read-only operations from controlled actions, and
-each execution returns structured data rather than scraped presentation text.
-React owns the visible approval states while the Cloudflare Worker and D1 retain
-the shared workflow state across the agent, operations dashboard, and field
-inbox.
-
-## Current Build
-
-- React operations board at `/`
-- Mobile field-responder inbox at `/drive`
-- Fictional response-partner directory at `/response`
+- React 19 + TypeScript + Vite
 - Cloudflare Worker API
-- Cloudflare D1 persistence
-- Approval-gated requests
-- Structured logistics responses
-- Illustrative source-quality feedback
+- D1 structured demo state
+- OpenAI Sites build and hosting metadata
+- Zod schemas converted to JSON Schema for WebMCP inputs
+- Vitest + Testing Library
 
-The core reference does not require R2 or Durable Objects. D1 persists the
-request loop, and the clients use short polling for updates.
+Device interoperability uses the logical adapter contract
+`grapevine.care.device.v1`. Each device advertises a bounded list of
+capabilities, status, firmware, provenance, and last-seen time. New equipment
+can join the same evidence model without gaining medication-release authority.
 
-## Local Setup
+## Local setup
+
+Requirements: Node 24+ and pnpm 11+.
 
 ```bash
 pnpm install
-pnpm exec wrangler d1 migrations apply grapevine --local
+pnpm exec wrangler d1 execute grapevine-care --local --file drizzle/0001_grapevine_care.sql
 pnpm run start
 ```
 
-Open:
-
-- Operations board: <http://localhost:5173/>
-- Field inbox: <http://localhost:5173/drive>
-- Resource coordination: <http://localhost:5173/response>
-
-Deployed routes:
-
-- Live ground truth: <https://project-grapevine.preflyhq.com/>
-- Field inbox: <https://project-grapevine.preflyhq.com/drive>
-- Resource coordination: <https://project-grapevine.preflyhq.com/response>
-
-Local D1 remains local unless `--remote` is explicitly passed to Wrangler.
-
-## Cloudflare Setup
-
-The checked-in `wrangler.jsonc` points to the hosted reference demo. For a fork,
-replace the D1 database ID and either replace the custom-domain route or remove
-it and enable `workers_dev`.
-
-Configure a D1 binding named `DB` in `wrangler.jsonc`:
-
-```json
-"d1_databases": [
-  {
-    "binding": "DB",
-    "database_name": "grapevine",
-    "database_id": "YOUR_D1_DATABASE_ID"
-  }
-]
-```
-
-For a fork without a custom domain, remove the existing `routes` block and set:
-
-```json
-"workers_dev": true
-```
-
-For a custom domain, replace the route pattern with a hostname in a Cloudflare
-zone you control.
-
-Apply migrations before deploying:
-
-```bash
-pnpm exec wrangler d1 migrations apply grapevine --remote
-pnpm run deploy
-```
-
-Authenticate through Wrangler or environment variables. Do not commit secrets.
+Open <http://localhost:5173/>.
 
 ## Verification
 
 ```bash
-pnpm run audit:public
 pnpm run test
 pnpm exec tsc --noEmit
+pnpm run audit:public
 pnpm run build
 ```
 
-## Public Repository Safety
+## Source lineage and license
 
-The repository contains no application secrets. Local environment files,
-Wrangler state, build output, logs, and dependency folders are ignored. The D1
-database UUID in `wrangler.jsonc` identifies the bound database but does not
-grant access; Cloudflare credentials are still required for queries or deploys.
+Grapevine Care is a distinct healthcare adaptation of
+[Project Grapevine](https://github.com/samueltate/project-grapevine). It retains
+the original project’s useful WebMCP pattern—structured evidence, shared human
+and agent context, and approval before consequence—while replacing the disaster
+logistics domain, data model, tools, interface, and demo flow.
 
-Run `pnpm run audit:public` before publishing. It fails on common credential
-formats, non-empty secret assignments, private keys, and personal filesystem
-paths. Keep real tokens in `.dev.vars`, `.env`, or your deployment environment;
-those files must remain uncommitted.
-
-## License
-
-MIT
-
-The static corridor map includes in-image attribution to OpenStreetMap
-contributors and OpenMapTiles.
+Copyright © 2026 Sam Tate & Miles Greer. Licensed under the [MIT License](LICENSE).

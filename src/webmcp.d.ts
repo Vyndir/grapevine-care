@@ -17,13 +17,14 @@ declare module "react" {
 declare global {
   interface WebMCPTool {
     name: string;
+    title?: string;
     description: string;
     inputSchema: object;
     annotations?: {
       readOnlyHint?: boolean;
       untrustedContentHint?: boolean;
     };
-    execute(input: unknown): Promise<unknown>;
+    execute(input: unknown, options?: { signal: AbortSignal }): Promise<unknown>;
   }
 
   interface WebMCPRegisterToolOptions {
