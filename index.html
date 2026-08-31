@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en" data-theme="workers">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Project Grapevine is a western North Carolina aid-logistics reference for permissioned ground truth from human and machine sources."
+    />
+    <link rel="icon" href="/favicon.ico" />
+    <title>Project Grapevine · Western NC Aid Logistics</title>
+    <script>
+      (() => {
+        const stored = localStorage.getItem("theme");
+        const mode = stored || "light";
+        document.documentElement.setAttribute("data-mode", mode);
+        document.documentElement.style.colorScheme = mode;
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/client.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,64 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { CoordinationRequest, ResponseBundle, ResponseNeed, ResponsePartner, ResponseShortlist } from "./responseSchemas";
+
+async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(path, {
+    ...options,
+    headers: { "content-type": "application/json", ...options.headers }
+  });
+  const data = await response.json() as T & { error?: string };
+  if (!response.ok) throw new Error(data.error || "Response coordination request failed.");
+  return data;
+}
+
+export type ResponseActions = {
+  refresh: () => Promise<ResponseBundle>;
+  getIncidentBrief: () => Promise<ResponseBundle["incident"]>;
+  findPartners: (need: ResponseNeed, area: string, localLedOnly?: boolean) => Promise<{ partners: ResponsePartner[]; matching_need: ResponseNeed; area: string }>;
+  getPartnerDetails: (partnerId: string) => Promise<ResponsePartner>;
+  createShortlist: (input: { title: string; need: ResponseNeed; area: string; partner_ids: string[]; rationale: string }) => Promise<ResponseShortlist>;
+  prepareCoordination: (input: { shortlist_id: string; objective: string; available_resources: string }) => Promise<{ request: CoordinationRequest; approval_required: true; recommended_next_step: Record<string, string> }>;
+  approveCoordination: (requestId: string) => Promise<CoordinationRequest>;
+};
+
+export function useResponse() {
+  const [bundle, setBundle] = useState<ResponseBundle | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    const result = await api<ResponseBundle>("/api/response/state");
+    setBundle(result);
+    return result;
+  }, []);
+
+  useEffect(() => {
+    void refresh().catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not load response directory."));
+  }, [refresh]);
+
+  const getIncidentBrief = useCallback(() => api<ResponseBundle["incident"]>("/api/response/incident"), []);
+  const findPartners = useCallback((need: ResponseNeed, area: string, local_led_only = false) => api<{ partners: ResponsePartner[]; matching_need: ResponseNeed; area: string }>("/api/response/partners/find", {
+    method: "POST", body: JSON.stringify({ need, area, local_led_only })
+  }), []);
+  const getPartnerDetails = useCallback((partnerId: string) => api<ResponsePartner>(`/api/response/partners/${encodeURIComponent(partnerId)}`), []);
+  const createShortlist = useCallback(async (input: { title: string; need: ResponseNeed; area: string; partner_ids: string[]; rationale: string }) => {
+    const result = await api<{ shortlist: ResponseShortlist }>("/api/response/shortlists", { method: "POST", body: JSON.stringify(input) });
+    await refresh();
+    return result.shortlist;
+  }, [refresh]);
+  const prepareCoordination = useCallback(async (input: { shortlist_id: string; objective: string; available_resources: string }) => {
+    const result = await api<{ request: CoordinationRequest; approval_required: true; recommended_next_step: Record<string, string> }>("/api/response/requests", { method: "POST", body: JSON.stringify(input) });
+    await refresh();
+    return result;
+  }, [refresh]);
+  const approveCoordination = useCallback(async (requestId: string) => {
+    const result = await api<{ request: CoordinationRequest }>(`/api/response/requests/${encodeURIComponent(requestId)}/approve`, { method: "POST" });
+    await refresh();
+    return result.request;
+  }, [refresh]);
+
+  const actions = useMemo<ResponseActions>(() => ({
+    refresh, getIncidentBrief, findPartners, getPartnerDetails, createShortlist, prepareCoordination, approveCoordination
+  }), [refresh, getIncidentBrief, findPartners, getPartnerDetails, createShortlist, prepareCoordination, approveCoordination]);
+
+  return { bundle, error, setError, actions };
+}
