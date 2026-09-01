@@ -73,6 +73,9 @@ This project is designed for the OpenAI WebMCP Challenge:
   explicit uncertainty.
 - The demo has deterministic scenarios and a one-click reset for reliable
   judging.
+- Every browser receives an isolated D1-backed demo run; confirmation,
+  inventory, evidence, and actions cannot leak between judges.
+- Reset reconstructs the complete run from a known seed in one database batch.
 - The public source includes setup instructions and an MIT license.
 
 See [Submission notes](docs/SUBMISSION.md), [Demo script](docs/DEMO_SCRIPT.md),
@@ -99,7 +102,7 @@ Requirements: Node 24+ and pnpm 11+.
 
 ```bash
 pnpm install
-pnpm exec wrangler d1 execute grapevine-care --local --file drizzle/0001_grapevine_care.sql
+pnpm run db:local
 pnpm run start
 ```
 
@@ -113,6 +116,9 @@ pnpm exec tsc --noEmit
 pnpm run audit:public
 pnpm run build
 ```
+
+`pnpm run eval` runs the published WebMCP and server-invariant evaluation set.
+See [recorded results](docs/EVAL_RESULTS.md).
 
 ## Source lineage and license
 

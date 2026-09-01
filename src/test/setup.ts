@@ -31,10 +31,12 @@ Object.defineProperty(globalThis, "localStorage", {
 
 beforeEach(() => {
   storage.clear();
-  Reflect.deleteProperty(document, "modelContext");
+  if (typeof document !== "undefined") Reflect.deleteProperty(document, "modelContext");
 });
 
 afterEach(() => {
-  cleanup();
-  Reflect.deleteProperty(document, "modelContext");
+  if (typeof document !== "undefined") {
+    cleanup();
+    Reflect.deleteProperty(document, "modelContext");
+  }
 });

@@ -7,6 +7,7 @@ type RegisteredTool = WebMCPTool;
 
 const baseState: CareState = {
   fictional: true,
+  demo_run_id: "run_testfrontend0001",
   resident: { id: "rose-demo", display_name: "Rose", timezone: "America/New_York", simulated_time: "2026-08-31T08:14:00-04:00", scenario: "on_schedule", severity: "routine" },
   doses: [
     { id: "dose-am", resident_id: "rose-demo", label: "Morning dose", scheduled_time: "08:00", window_label: "7:30–9:00 AM", compartment: "M–AM", status: "ready", confirmed_at: null },
@@ -17,7 +18,10 @@ const baseState: CareState = {
     { id: "device-pillbox", resident_id: "rose-demo", name: "Care Station GC-01", device_type: "medication_dispenser", status: "online", battery_percent: 86, firmware: "1.0.0-demo", capabilities: ["schedule.read", "compartment.release.local_only"], door_state: "closed", last_seen: "2026-08-31T08:14:00-04:00" }
   ],
   inventory: { resident_id: "rose-demo", units_remaining: 24, daily_cadence: 3, updated_at: "2026-08-31T08:14:00-04:00" },
-  events: [{ id: "evt-1", resident_id: "rose-demo", event_type: "window_verified", severity: "routine", summary: "Morning window verified", detail: "All deterministic checks passed.", source: "Care Station GC-01", occurred_at: "2026-08-31T08:14:00-04:00" }],
+  events: [
+    { id: "evt-1", resident_id: "rose-demo", event_type: "window_verified", severity: "routine", summary: "Morning window verified", detail: "All deterministic checks passed.", source: "Care Station GC-01", occurred_at: "2026-08-31T08:14:00-04:00" },
+    { id: "evt-confirmed", resident_id: "rose-demo", event_type: "dose_confirmed", severity: "routine", summary: "Evening dose confirmed", detail: "Local confirmation recorded.", source: "Test local attestation", occurred_at: "2026-08-29T19:42:00-04:00" }
+  ],
   actions: [],
   safety_contract: { ai_may: ["Read evidence"], ai_may_not: ["Release medication", "Diagnose", "Contact emergency services"], emergency_notice: "Contact local emergency services in an emergency." }
 };
@@ -51,16 +55,18 @@ function installFetch() {
   return fetchMock;
 }
 
-beforeEach(() => { vi.restoreAllMocks(); installFetch(); });
+beforeEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); installFetch(); });
 
 describe("Grapevine Care", () => {
   it("presents a large-touch resident flow and registers six bounded tools", async () => {
     const tools = installModelContext();
     render(<App />);
     expect(await screen.findByRole("heading", { name: "Good morning, Rose." })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Hold to verify/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Verify locally/i })).toBeEnabled();
     await waitFor(() => expect(tools.size).toBe(6));
     expect([...tools.keys()].sort()).toEqual(["get_care_evidence", "get_care_overview", "get_device_capabilities", "get_inventory_forecast", "get_medication_schedule", "prepare_caregiver_check_in"]);
+    expect(screen.getByText(/Aug 29 · 7:42 PM/i)).toBeInTheDocument();
+    expect(screen.getByText("Test local attestation")).toBeInTheDocument();
   });
 
   it("shows explicit uncertainty after the missed-window scenario", async () => {

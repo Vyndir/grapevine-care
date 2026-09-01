@@ -1,52 +1,65 @@
 # Three-minute demo script
 
-## 0:00–0:25 — The problem
+## 0:00–0:12 — WebMCP immediately
 
-“Medication support is not just a reminder problem. Families need trustworthy
-evidence, older adults need dignity and clarity, and an AI agent must never
-quietly become the prescriber, dispenser, or emergency dispatcher.”
+Begin with **Missed window** already active. Ask ChatGPT to review Rose's care
+state using this page's tools. Show `get_care_overview` and
+`get_care_evidence` being called.
 
-Show Rose’s resident screen and the visible “device—not the AI” explanation.
+“Rose's medication window ended without a removal confirmation. That is a care
+signal—not proof she missed a dose and not proof of an emergency.”
 
-## 0:25–0:55 — Resident and device boundary
+## 0:12–0:30 — The human problem
 
-Show the eligible morning window, deterministic safety checks, and local
-fingerprint simulation. Confirm the dose. Point out that only one compartment
-changes and that no biometric data is exposed.
+Show the caregiver workspace beside the agent response.
 
-## 0:55–1:25 — A meaningful care signal
+“A caregiver should not have to manually reconcile a schedule, dispenser
+status, inventory, and device history—and an AI should not guess what happened.”
 
-Reset, then choose **Missed window**. Switch to the caregiver workspace. Show:
+## 0:30–1:15 — Structured evidence, not scraping
 
-- the latest observation;
-- the source and timestamp;
-- the explicit uncertainty that removal, ingestion, and welfare are different;
-- the inventory and device-health context.
+Let ChatGPT inspect schedule, evidence, inventory, and device capabilities.
+Point out provenance, timestamps, stale-state handling, and explicit
+uncertainty. Mention that every judge has an isolated demo run.
 
-## 1:25–2:20 — WebMCP collaboration
+## 1:15–1:40 — Agent prepares; person decides
 
-Use the README judge prompt. Let ChatGPT call the five read-only tools and
-summarize the evidence. Then let it call `prepare_caregiver_check_in`.
+Let ChatGPT call `prepare_caregiver_check_in`. When the review drawer opens:
 
-When the review drawer opens, say: “The agent prepared; it did not perform.”
-Show the three negative confirmations and approve or dismiss the simulated
-action.
+“The agent prepared; it did not perform. No call, message, visit, medication
+change, diagnosis, or emergency determination has occurred.”
 
-## 2:20–2:50 — Extensibility
+Approve or dismiss the simulated action in the visible human surface.
 
-Open **Devices & MCP**. Show the adapter contract and three device categories.
-Explain that each device advertises bounded capabilities and provenance, while
-medication release and biometric data are never agent-facing.
+## 1:40–1:55 — Authority stays local
 
-## 2:50–3:00 — Close
+Open Rose's station. Show the secured compartment and explain that medication
+release and local attestation are deliberately absent from WebMCP.
 
-“Grapevine Care turns a page into a safe coordination surface where devices
-observe, agents structure evidence, and people remain responsible for
-consequences.”
+## 1:55–2:18 — Extensible evidence plane
+
+Open **Devices & MCP**. Show `grapevine.care.device.v1`, the medication
+dispenser, room sensor, and blood-pressure cuff.
+
+“Heterogeneous devices become understandable to agents without becoming
+controllable by agents.”
+
+## 2:18–2:42 — Reliability evidence
+
+Briefly show the public repository, server invariant tests, evaluation results,
+safety case, and joint MIT license. Mention full reset and cross-browser
+isolation.
+
+## 2:42–2:59 — Close
+
+“Grapevine Care is a proposed control plane for human-agent-device
+collaboration in consequential environments. Devices observe. Agents structure
+evidence. People stay in control.”
 
 ## Recording checklist
 
 - Keep the final video under three minutes.
+- Show a real WebMCP call within the first 12 seconds.
 - Record at 1080p with readable browser zoom and clear audio.
 - Show the deployed URL and real tool calls.
 - Use no third-party music, logos, or private data.

@@ -29,12 +29,15 @@
   "type": "module",
   "scripts": {
     "start": "vite dev",
-    "db:local": "wrangler d1 execute grapevine-care --local --file drizzle/0001_grapevine_care.sql",
+    "db:local": "wrangler d1 execute grapevine-care --local --file drizzle/0001_grapevine_care.sql && wrangler d1 execute grapevine-care --local --file drizzle/0002_demo_run_isolation.sql",
     "build": "vite build",
     "deploy": "vite build && wrangler deploy",
     "audit:public": "node scripts/audit-public.mjs",
     "types": "wrangler types env.d.ts --include-runtime false",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:server": "vitest run src/server.test.ts --reporter=verbose",
+    "eval": "vitest run",
+    "verify": "pnpm run test && tsc --noEmit && pnpm run audit:public && pnpm run build"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

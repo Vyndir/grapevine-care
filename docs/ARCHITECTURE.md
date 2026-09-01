@@ -44,10 +44,20 @@ reason and caller-generated idempotency key. It creates an
 
 ## Persistence
 
-D1 stores the fictional resident, medication windows, device registry,
-inventory, evidence events, and staged actions. Indexed query paths are based on
-resident ID plus schedule time, device type, or event/action time. The unique
-idempotency index prevents duplicate staged actions.
+D1 stores an isolated fictional run for each browser session. Every medication
+window, device, inventory record, evidence event, and staged action is keyed by
+the opaque `demo_run_id` sent in a same-origin header. Indexed query paths begin
+with that run ID; a composite unique constraint prevents duplicate idempotency
+keys within a run without coupling different judges.
+
+The scenario endpoint is a full reset, not a partial mutation. A single D1
+batch removes that run's mutable records and reconstructs doses, devices,
+inventory, evidence, and actions from a known seed. Another browser's run is
+never read or changed.
+
+Conditional server updates enforce single dose confirmation and single action
+resolution. Review events use Rose's simulated time, so the visible timeline
+and structured evidence remain deterministic.
 
 ## Production evolution
 

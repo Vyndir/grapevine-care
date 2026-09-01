@@ -22,6 +22,9 @@ caregivers.
 | Stale telemetry appears current | Every event has source and time; offline scenario surfaces uncertainty |
 | Agent contacts someone without consent | Tool can only stage; visible human approval is required |
 | Duplicate staged outreach | Unique, caller-supplied idempotency key enforced by D1 |
+| One judge changes another judge's demo | Every mutable row is scoped to an isolated browser run |
+| Reset leaves stale inventory or evidence | Full run reconstruction in one D1 batch |
+| Repeated approval creates duplicate history | Conditional resolution; already-resolved actions return without another event |
 | Device adapter gains excessive authority | Static least-privilege capabilities; adapters cannot add executable tools |
 | Sensitive real-world data enters the demo | Fixed fictional resident and devices; no authentication, uploads, contacts, or external APIs |
 
@@ -33,6 +36,8 @@ caregivers.
 - Window missed: compartment remains locked; no emergency conclusion is made.
 - Invalid or oversized input: request is rejected.
 - Repeated idempotency key: existing staged action is returned.
+- Repeated dose confirmation or action resolution: no second mutation or event.
+- Scenario reset: all mutable run state returns to the documented seed.
 
 ## Human factors
 

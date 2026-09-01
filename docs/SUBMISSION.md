@@ -10,15 +10,16 @@ Devices observe. Agents structure evidence. People stay in control.
 
 ## Inspiration
 
-Families supporting older adults often receive fragmented medication reminders,
-device alerts, and inventory notices without a trustworthy picture of what is
-known or what still needs human judgment. Grapevine Care explores a better
-human-agent relationship: WebMCP gives the agent structured evidence, while the
-device and caregiver retain authority over consequential actions.
+Rose's morning medication window ends without a removal confirmation. Her
+caregiver should not have to manually reconcile a dispenser alert, schedule,
+device status, inventory level, and activity history—and an AI should not guess
+what happened. Grapevine Care gives an agent structured evidence through
+WebMCP, lets it explain what is known and unknown, and lets it prepare the next
+human check-in without gaining authority over medication or emergency decisions.
 
 ## What it does
 
-The fictional demo connects an elder-friendly medication station, caregiver
+The fictional, per-browser demo connects an elder-friendly medication station, caregiver
 workspace, and extensible device registry. Six WebMCP tools let an agent inspect
 care status, medication windows, inventory, device capabilities, and evidence,
 then stage—but never send—a caregiver check-in. The visible interface requires
@@ -27,7 +28,7 @@ a person to approve or dismiss that action.
 ## How we built it
 
 React and TypeScript provide the shared human interface. A Cloudflare Worker and
-D1 keep deterministic demo state. Zod produces bounded JSON Schemas for tools
+D1 keep isolated, deterministic demo runs with a complete reset. Zod produces bounded JSON Schemas for tools
 registered with `document.modelContext.registerTool`. Device records implement a
 least-privilege `grapevine.care.device.v1` adapter. OpenAI Sites packages and
 hosts the project.
@@ -50,6 +51,8 @@ the interface.
 ## Accomplishments
 
 - A deterministic, resettable judge flow.
+- Isolated browser runs that prevent cross-judge state contamination.
+- Server-enforced single confirmation, idempotent staging, and single review.
 - Five read-only tools and one idempotent, approval-gated write tool.
 - Explicit uncertainty for missed windows and stale devices.
 - Elder, caregiver, and device/MCP surfaces in one shared application.
