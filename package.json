@@ -5,9 +5,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/samueltate/project-grapevine.git"
+    "url": "https://github.com/Vyndir/grapevine-care.git"
   },
-  "homepage": "",
+  "homepage": "https://grapevine-care.miles-g.chatgpt.site/",
   "keywords": [
     "cloudflare-workers",
     "webmcp",
@@ -16,7 +16,7 @@
     "human-intelligence"
   ],
   "cloudflare": {
-    "label": "Grapevine",
+    "label": "Grapevine Care",
     "products": [
       "Workers"
     ],
@@ -25,7 +25,7 @@
       "ai"
     ]
   },
-  "private": true,
+  "private": false,
   "type": "module",
   "scripts": {
     "start": "vite dev",

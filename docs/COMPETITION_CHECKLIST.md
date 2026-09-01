@@ -13,17 +13,18 @@ Verified against the official challenge and Devpost rules on August 31, 2026.
 - [x] Responsive, keyboard-focusable, reduced-motion-aware UI
 - [x] Public-repository-ready source, setup, tests, and MIT license
 - [x] Clear source lineage from Project Grapevine
+- [x] Dedicated repository identity, origin record, and WebMCP evaluation matrix
 - [x] Submission copy and under-three-minute demo script
 
 ## Required before final Devpost submission
 
-- [ ] Deploy the validated build to a live Sites URL
+- [x] Deploy the validated build to a live Sites URL
 - [ ] Publish this healthcare adaptation in a public repository
 - [ ] Confirm the MIT license is visible at the repository root/about area
 - [ ] Record and publicly upload the demo video to YouTube with audio
 - [ ] Add live URL, repository URL, video URL, screenshots, and team members to Devpost
 - [ ] Run the judge prompt in ChatGPT’s in-app browser on the deployed URL
-- [ ] Confirm the app works free of charge and without judge-only credentials
+- [ ] Set the Sites deployment to judge-accessible public access
 - [ ] Submit before September 3, 2026 at 1:00 p.m. PT
 
 The project must remain available throughout judging. Any external libraries,

@@ -71,6 +71,6 @@ architecture if the concept is appropriate to pursue.
 
 ## Required links before submission
 
-- Live Sites URL: _add after deployment_
-- Public repository URL: _publish this healthcare adaptation_
+- Live Sites URL: https://grapevine-care.miles-g.chatgpt.site/
+- Public repository URL: https://github.com/Vyndir/grapevine-care
 - Public YouTube demo: _record and upload using `docs/DEMO_SCRIPT.md`_

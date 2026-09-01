@@ -76,7 +76,8 @@ This project is designed for the OpenAI WebMCP Challenge:
 - The public source includes setup instructions and an MIT license.
 
 See [Submission notes](docs/SUBMISSION.md), [Demo script](docs/DEMO_SCRIPT.md),
-[Architecture](docs/ARCHITECTURE.md), and [Safety case](docs/SAFETY.md).
+[Architecture](docs/ARCHITECTURE.md), [Safety case](docs/SAFETY.md), and the
+[WebMCP evaluation matrix](docs/WEBMCP_EVALUATION.md).
 
 ## Architecture
 
@@ -120,5 +121,11 @@ Grapevine Care is a distinct healthcare adaptation of
 the original project’s useful WebMCP pattern—structured evidence, shared human
 and agent context, and approval before consequence—while replacing the disaster
 logistics domain, data model, tools, interface, and demo flow.
+
+The complete provenance, inherited foundation, and healthcare-specific changes
+are recorded in [PROJECT_ORIGIN.md](PROJECT_ORIGIN.md). The submission repository
+is [Vyndir/grapevine-care](https://github.com/Vyndir/grapevine-care); the upstream
+disaster-response repository remains a separate project and is not modified by
+this submission.
 
 Copyright © 2026 Sam Tate & Miles Greer. Licensed under the [MIT License](LICENSE).
