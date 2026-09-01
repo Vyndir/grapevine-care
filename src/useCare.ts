@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CareState, PreparedAction, Scenario } from "./schemas";
+import type { CareEvent, CareState, PreparedAction, ResidentCheckIn, ResidentResponseCode, Scenario } from "./schemas";
 
 const demoRunStorageKey = "grapevine-care-demo-run";
 
@@ -26,7 +26,11 @@ export type CareActions = {
   refresh(): Promise<CareState>;
   setScenario(scenario: Scenario): Promise<CareState>;
   confirmDose(doseId: string): Promise<CareState>;
-  prepareAction(input: { resident_id: string; channel: PreparedAction["channel"]; reason: string; idempotency_key: string; }): Promise<{ action: PreparedAction; approval_required: true; external_side_effect: false; }>;
+  getEvidenceSnapshot(input: { resident_id: string; event_limit?: number; }): Promise<{ fictional: true; evidence_snapshot_id: string; evidence_version: number; observed_at: string; events: Array<Pick<CareEvent, "id" | "event_type" | "actor_type" | "actor_id" | "evidence_type" | "observed_at" | "summary" | "trust_boundary" | "plan_version">>; uncertainty: string; next_step: string; }>;
+  prepareResidentCheckIn(input: { resident_id: string; prompt: string; evidence_snapshot_id: string; idempotency_key: string; }): Promise<{ check_in: ResidentCheckIn; resident_response_required: true; external_side_effect: false; }>;
+  respondResidentCheckIn(checkInId: string, responseCode: ResidentResponseCode): Promise<CareState>;
+  prepareAction(input: { resident_id: string; channel: PreparedAction["channel"]; reason: string; evidence_snapshot_id: string; idempotency_key: string; }): Promise<{ action: PreparedAction; approval_required: true; external_side_effect: false; }>;
+  requestDeviceHealthSnapshot(input: { resident_id: string; device_id: string; idempotency_key: string; }): Promise<{ fictional: true; diagnostic: Record<string, unknown>; external_side_effect: false; duplicate_prevented: boolean; evidence_changed: boolean; next_step?: string; }>;
   resolveAction(actionId: string, resolution: "approved_in_demo" | "dismissed"): Promise<CareState>;
 };
 
@@ -65,8 +69,31 @@ export function useCare() {
     } finally { setBusy(false); }
   }, [commit]);
 
-  const prepareAction = useCallback(async (input: { resident_id: string; channel: PreparedAction["channel"]; reason: string; idempotency_key: string; }) => {
+  const getEvidenceSnapshot = useCallback((input: { resident_id: string; event_limit?: number; }) =>
+    api<Awaited<ReturnType<CareActions["getEvidenceSnapshot"]>>>("/api/care/evidence-snapshot", demoRunIdRef.current, { method: "POST", body: JSON.stringify(input) }), []);
+
+  const prepareResidentCheckIn = useCallback(async (input: { resident_id: string; prompt: string; evidence_snapshot_id: string; idempotency_key: string; }) => {
+    const result = await api<Awaited<ReturnType<CareActions["prepareResidentCheckIn"]>>>("/api/care/resident-check-ins", demoRunIdRef.current, { method: "POST", body: JSON.stringify(input) });
+    await refresh();
+    return result;
+  }, [refresh]);
+
+  const respondResidentCheckIn = useCallback(async (checkInId: string, responseCode: ResidentResponseCode) => {
+    setBusy(true);
+    try {
+      const result = await api<{ state: CareState }>(`/api/care/resident-check-ins/${encodeURIComponent(checkInId)}/respond`, demoRunIdRef.current, { method: "POST", body: JSON.stringify({ response_code: responseCode }) });
+      return commit(result.state);
+    } finally { setBusy(false); }
+  }, [commit]);
+
+  const prepareAction = useCallback(async (input: { resident_id: string; channel: PreparedAction["channel"]; reason: string; evidence_snapshot_id: string; idempotency_key: string; }) => {
     const result = await api<{ action: PreparedAction; approval_required: true; external_side_effect: false; }>("/api/care/actions", demoRunIdRef.current, { method: "POST", body: JSON.stringify(input) });
+    await refresh();
+    return result;
+  }, [refresh]);
+
+  const requestDeviceHealthSnapshot = useCallback(async (input: { resident_id: string; device_id: string; idempotency_key: string; }) => {
+    const result = await api<Awaited<ReturnType<CareActions["requestDeviceHealthSnapshot"]>>>("/api/care/device-health-snapshots", demoRunIdRef.current, { method: "POST", body: JSON.stringify(input) });
     await refresh();
     return result;
   }, [refresh]);
@@ -79,6 +106,6 @@ export function useCare() {
     } finally { setBusy(false); }
   }, [commit]);
 
-  const actions = useMemo<CareActions>(() => ({ getState, refresh, setScenario, confirmDose, prepareAction, resolveAction }), [getState, refresh, setScenario, confirmDose, prepareAction, resolveAction]);
+  const actions = useMemo<CareActions>(() => ({ getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, resolveAction }), [getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, resolveAction]);
   return { state, error, setError, busy, actions };
 }

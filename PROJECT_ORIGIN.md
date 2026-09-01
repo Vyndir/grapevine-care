@@ -36,28 +36,36 @@ diminish either contributor's authorship or licensing rights.
 
 ## New WebMCP contract
 
-Grapevine Care registers six healthcare-specific tools:
+Grapevine Care defines eight healthcare-specific tools and exposes only the
+subset appropriate to the current human workflow state:
 
 1. `get_care_overview`
 2. `get_medication_schedule`
 3. `get_inventory_forecast`
 4. `get_device_capabilities`
 5. `get_care_evidence`
-6. `prepare_caregiver_check_in`
+6. `prepare_resident_check_in`
+7. `prepare_caregiver_check_in`
+8. `request_device_health_snapshot`
 
 These are not renamed disaster-logistics operations. They use a distinct care
-evidence model and different approval semantics. Five tools are read-only. The
-only state-changing tool stages a reversible check-in for visible human review;
-it cannot contact anyone. Medication release, biometric confirmation, dosage
-changes, diagnosis, emergency determination, and clinical decisions are not
-exposed to agents.
+evidence model, a resident evidence-resolution loop, versioned evidence
+snapshots, dynamic capability registration, and different approval semantics.
+The agent can place a bounded question on Rose's station but cannot answer it;
+only Rose's visible controls can contribute her self-report. Any evidence change
+invalidates older snapshot IDs. A later caregiver action remains reversible and
+approval-gated, and cannot contact anyone. The device diagnostic is non-clinical
+and cannot control the device. Medication release, biometric confirmation,
+dosage changes, diagnosis, emergency determination, and clinical decisions are
+not exposed to agents.
 
 ## Independent submission artifacts
 
 - Repository: https://github.com/Vyndir/grapevine-care
 - Live application: https://grapevine-care.miles-g.chatgpt.site/
 - Package: `grapevine-care-webmcp`
-- Database and migration: `grapevine-care` / `drizzle/0001_grapevine_care.sql`
+- Database and migrations: `grapevine-care` / `drizzle/0001_grapevine_care.sql`
+  through `drizzle/0003_evidence_resolution_loop.sql`
 - Architecture, safety case, demo script, submission copy, competition
   checklist, and evaluation matrix are maintained within this repository.
 

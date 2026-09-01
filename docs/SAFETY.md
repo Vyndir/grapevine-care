@@ -21,7 +21,12 @@ caregivers.
 | Missed confirmation treated as proof of harm | UI and tool outputs state that ingestion and welfare remain unknown |
 | Stale telemetry appears current | Every event has source and time; offline scenario surfaces uncertainty |
 | Agent contacts someone without consent | Tool can only stage; visible human approval is required |
+| Agent answers on the resident’s behalf | Resident response endpoint is absent from WebMCP; only visible Rose-station controls contribute self-report |
+| Resident self-report treated as medication proof | Structured trust boundary explicitly separates self-report from removal, ingestion, and clinical verification |
+| Agent acts on stale evidence | Preparation requires the current server-issued evidence snapshot ID |
+| Static tools remain available during human decisions | Page unregisters preparation tools while resident or caregiver review is pending |
 | Duplicate staged outreach | Unique, caller-supplied idempotency key enforced by D1 |
+| Device diagnostic becomes remote control | Diagnostic returns non-clinical health only; no release, biometric, or clinical-reading capability |
 | One judge changes another judge's demo | Every mutable row is scoped to an isolated browser run |
 | Reset leaves stale inventory or evidence | Full run reconstruction in one D1 batch |
 | Repeated approval creates duplicate history | Conditional resolution; already-resolved actions return without another event |
@@ -36,6 +41,8 @@ caregivers.
 - Window missed: compartment remains locked; no emergency conclusion is made.
 - Invalid or oversized input: request is rejected.
 - Repeated idempotency key: existing staged action is returned.
+- Changed evidence: an old snapshot is rejected and the agent must re-observe.
+- Resident response pending: preparation capabilities are removed.
 - Repeated dose confirmation or action resolution: no second mutation or event.
 - Scenario reset: all mutable run state returns to the documented seed.
 

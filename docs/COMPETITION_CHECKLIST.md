@@ -12,6 +12,10 @@ Verified against the official challenge and Devpost rules on August 31, 2026.
 - [x] Deterministic scenarios and reset
 - [x] Per-browser demo isolation and complete atomic reset
 - [x] Server invariant tests and GitHub Actions verification
+- [x] Resident evidence-resolution loop with human-only response controls
+- [x] Evidence-snapshot binding and stale-state rejection
+- [x] State-dependent WebMCP capability registration
+- [x] Structured evidence chain of custody and safe device diagnostics
 - [x] Responsive, keyboard-focusable, reduced-motion-aware UI
 - [x] Public-repository-ready source, setup, tests, and MIT license
 - [x] Clear source lineage from Project Grapevine

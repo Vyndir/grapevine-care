@@ -8,6 +8,7 @@ type RegisteredTool = WebMCPTool;
 const baseState: CareState = {
   fictional: true,
   demo_run_id: "run_testfrontend0001",
+  evidence_version: 1,
   resident: { id: "rose-demo", display_name: "Rose", timezone: "America/New_York", simulated_time: "2026-08-31T08:14:00-04:00", scenario: "on_schedule", severity: "routine" },
   doses: [
     { id: "dose-am", resident_id: "rose-demo", label: "Morning dose", scheduled_time: "08:00", window_label: "7:30–9:00 AM", compartment: "M–AM", status: "ready", confirmed_at: null },
@@ -15,14 +16,16 @@ const baseState: CareState = {
     { id: "dose-pm", resident_id: "rose-demo", label: "Evening dose", scheduled_time: "20:00", window_label: "7:30–9:00 PM", compartment: "M–PM", status: "upcoming", confirmed_at: null }
   ],
   devices: [
-    { id: "device-pillbox", resident_id: "rose-demo", name: "Care Station GC-01", device_type: "medication_dispenser", status: "online", battery_percent: 86, firmware: "1.0.0-demo", capabilities: ["schedule.read", "compartment.release.local_only"], door_state: "closed", last_seen: "2026-08-31T08:14:00-04:00" }
+    { id: "device-pillbox", resident_id: "rose-demo", name: "Care Station GC-01", device_type: "medication_dispenser", status: "online", battery_percent: 86, firmware: "1.2.0-demo", capabilities: ["schedule.read", "compartment.release.local_only"], door_state: "closed", last_seen: "2026-08-31T08:14:00-04:00", sensor_health: "nominal", applied_plan_version: "v4" }
   ],
   inventory: { resident_id: "rose-demo", units_remaining: 24, daily_cadence: 3, updated_at: "2026-08-31T08:14:00-04:00" },
   events: [
-    { id: "evt-1", resident_id: "rose-demo", event_type: "window_verified", severity: "routine", summary: "Morning window verified", detail: "All deterministic checks passed.", source: "Care Station GC-01", occurred_at: "2026-08-31T08:14:00-04:00" },
-    { id: "evt-confirmed", resident_id: "rose-demo", event_type: "dose_confirmed", severity: "routine", summary: "Evening dose confirmed", detail: "Local confirmation recorded.", source: "Test local attestation", occurred_at: "2026-08-29T19:42:00-04:00" }
+    { id: "evt-1", resident_id: "rose-demo", event_type: "window_verified", severity: "routine", summary: "Morning window verified", detail: "All deterministic checks passed.", source: "Care Station GC-01", occurred_at: "2026-08-31T08:14:00-04:00", actor_type: "device", actor_id: "device-pillbox", evidence_type: "observation", observed_at: "2026-08-31T08:14:00-04:00", recorded_at: "2026-08-31T08:14:00-04:00", trust_boundary: "device_attested_simulation", plan_version: "v4" },
+    { id: "evt-confirmed", resident_id: "rose-demo", event_type: "dose_confirmed", severity: "routine", summary: "Evening dose confirmed", detail: "Local confirmation recorded.", source: "Test local attestation", occurred_at: "2026-08-29T19:42:00-04:00", actor_type: "resident", actor_id: "rose-demo", evidence_type: "observation", observed_at: "2026-08-29T19:42:00-04:00", recorded_at: "2026-08-29T19:42:00-04:00", trust_boundary: "local_attestation_only", plan_version: "v4" }
   ],
+  resident_check_ins: [],
   actions: [],
+  care_plan: { version: "v4", effective_at: "2026-08-31T07:00:00-04:00", authorized_by: "Nurse Ava", authorization_role: "Care team RN", device_applied_version: "v4", alignment: "aligned" },
   safety_contract: { ai_may: ["Read evidence"], ai_may_not: ["Release medication", "Diagnose", "Contact emergency services"], emergency_notice: "Contact local emergency services in an emergency." }
 };
 
@@ -39,11 +42,21 @@ function installFetch() {
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
     if (url.startsWith("/api/care/state")) return Response.json(state);
     if (url === "/api/care/scenario") {
-      if (body.scenario === "missed_window") state = { ...state, resident: { ...state.resident, scenario: "missed_window", severity: "attention" }, doses: state.doses.map((dose, index) => index === 0 ? { ...dose, status: "missed" } : dose), events: [{ ...state.events[0], id: "evt-missed", severity: "attention", summary: "Medication window elapsed" }, ...state.events] };
+      if (body.scenario === "missed_window") state = { ...state, evidence_version: 1, resident: { ...state.resident, scenario: "missed_window", severity: "attention" }, doses: state.doses.map((dose, index) => index === 0 ? { ...dose, status: "missed" } : dose), resident_check_ins: [], actions: [], events: [{ ...state.events[0], id: "evt-missed", severity: "attention", summary: "Medication window elapsed" }, ...state.events] };
+      return Response.json({ state });
+    }
+    if (url === "/api/care/evidence-snapshot") return Response.json({ fictional: true, evidence_snapshot_id: `snapshot-test-version-${state.evidence_version}`, evidence_version: state.evidence_version, observed_at: state.resident.simulated_time, events: state.events.slice(0, 5), uncertainty: "Medication removal was not confirmed. Ingestion and welfare remain unknown.", next_step: "Use an available capability." });
+    if (url === "/api/care/resident-check-ins") {
+      const checkIn = { id: "resident-check-in-1", resident_id: "rose-demo", prompt: String(body.prompt), status: "awaiting_resident" as const, response_code: null, evidence_snapshot_id: String(body.evidence_snapshot_id), idempotency_key: String(body.idempotency_key), created_at: state.resident.simulated_time, responded_at: null };
+      state = { ...state, evidence_version: state.evidence_version + 1, resident_check_ins: [checkIn] };
+      return Response.json({ check_in: checkIn, resident_response_required: true, external_side_effect: false });
+    }
+    if (url.includes("/resident-check-ins/") && url.endsWith("/respond")) {
+      state = { ...state, evidence_version: state.evidence_version + 1, resident_check_ins: state.resident_check_ins.map((checkIn) => ({ ...checkIn, status: "responded", response_code: body.response_code as "im_okay", responded_at: state.resident.simulated_time })) };
       return Response.json({ state });
     }
     if (url === "/api/care/actions") {
-      const action: PreparedAction = { id: "action-1", resident_id: "rose-demo", channel: body.channel as PreparedAction["channel"], reason: String(body.reason), status: "awaiting_human_approval", idempotency_key: String(body.idempotency_key), created_at: state.resident.simulated_time, resolved_at: null };
+      const action: PreparedAction = { id: "action-1", resident_id: "rose-demo", channel: body.channel as PreparedAction["channel"], reason: String(body.reason), status: "awaiting_human_approval", evidence_snapshot_id: String(body.evidence_snapshot_id), idempotency_key: String(body.idempotency_key), created_at: state.resident.simulated_time, resolved_at: null };
       state = { ...state, actions: [action] };
       return Response.json({ action, approval_required: true, external_side_effect: false });
     }
@@ -58,13 +71,13 @@ function installFetch() {
 beforeEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); installFetch(); });
 
 describe("Grapevine Care", () => {
-  it("presents a large-touch resident flow and registers six bounded tools", async () => {
+  it("presents a large-touch resident flow and registers only current capabilities", async () => {
     const tools = installModelContext();
     render(<App />);
     expect(await screen.findByRole("heading", { name: "Good morning, Rose." })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Verify locally/i })).toBeEnabled();
-    await waitFor(() => expect(tools.size).toBe(6));
-    expect([...tools.keys()].sort()).toEqual(["get_care_evidence", "get_care_overview", "get_device_capabilities", "get_inventory_forecast", "get_medication_schedule", "prepare_caregiver_check_in"]);
+    await waitFor(() => expect(tools.size).toBe(5));
+    expect([...tools.keys()].sort()).toEqual(["get_care_evidence", "get_care_overview", "get_inventory_forecast", "get_medication_schedule", "prepare_caregiver_check_in"]);
     expect(screen.getByText(/Aug 29 · 7:42 PM/i)).toBeInTheDocument();
     expect(screen.getByText("Test local attestation")).toBeInTheDocument();
   });
@@ -78,11 +91,27 @@ describe("Grapevine Care", () => {
     expect(screen.getByText(/ingestion and welfare remain unknown/i)).toBeInTheDocument();
   });
 
+  it("lets the agent prepare a bounded question that only Rose can answer", async () => {
+    const tools = installModelContext();
+    render(<App />);
+    await screen.findByText("Good morning, Rose.");
+    fireEvent.click(screen.getByRole("button", { name: "Missed window" }));
+    await waitFor(() => expect(tools.has("prepare_resident_check_in")).toBe(true));
+    const evidence = await tools.get("get_care_evidence")!.execute({ resident_id: "rose-demo" }) as { evidence_snapshot_id: string };
+    await act(async () => { await tools.get("prepare_resident_check_in")!.execute({ resident_id: "rose-demo", prompt: "Your care circle wants to check in. Are you okay?", evidence_snapshot_id: evidence.evidence_snapshot_id, idempotency_key: "resident-check-001" }); });
+    expect(await screen.findByRole("heading", { name: "Your care circle wants to check in. Are you okay?" })).toBeInTheDocument();
+    expect(tools.has("prepare_resident_check_in")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "I'm okay" }));
+    expect(await screen.findByText("Thank you, Rose.")).toBeInTheDocument();
+    await waitFor(() => expect(tools.has("prepare_caregiver_check_in")).toBe(true));
+  });
+
   it("stages agent outreach and stops at human review", async () => {
     const tools = installModelContext();
     render(<App />);
-    await waitFor(() => expect(tools.size).toBe(6));
-    await act(async () => { await tools.get("prepare_caregiver_check_in")!.execute({ resident_id: "rose-demo", channel: "call", reason: "The missed confirmation needs caregiver review.", idempotency_key: "test-action-001" }); });
+    await waitFor(() => expect(tools.has("prepare_caregiver_check_in")).toBe(true));
+    const evidence = await tools.get("get_care_evidence")!.execute({ resident_id: "rose-demo" }) as { evidence_snapshot_id: string };
+    await act(async () => { await tools.get("prepare_caregiver_check_in")!.execute({ resident_id: "rose-demo", channel: "call", reason: "The current evidence needs caregiver review.", evidence_snapshot_id: evidence.evidence_snapshot_id, idempotency_key: "test-action-001" }); });
     expect(await screen.findByRole("dialog", { name: "Review caregiver check-in" })).toBeInTheDocument();
     expect(screen.getByText("No one has been contacted")).toBeInTheDocument();
   });

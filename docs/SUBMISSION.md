@@ -19,16 +19,18 @@ human check-in without gaining authority over medication or emergency decisions.
 
 ## What it does
 
-The fictional, per-browser demo connects an elder-friendly medication station, caregiver
-workspace, and extensible device registry. Six WebMCP tools let an agent inspect
-care status, medication windows, inventory, device capabilities, and evidence,
-then stage—but never send—a caregiver check-in. The visible interface requires
-a person to approve or dismiss that action.
+The fictional, per-browser demo connects an elder-friendly medication station,
+caregiver workspace, and extensible device registry. When a medication removal
+is unconfirmed, the agent reads a versioned evidence snapshot, prepares a
+bounded question that only Rose can answer, re-reads the changed evidence, and
+then may prepare—but never send—a caregiver check-in. A person approves or
+dismisses the final action.
 
 ## How we built it
 
 React and TypeScript provide the shared human interface. A Cloudflare Worker and
-D1 keep isolated, deterministic demo runs with a complete reset. Zod produces bounded JSON Schemas for tools
+D1 keep isolated, deterministic demo runs with a complete reset and versioned
+evidence snapshots. Zod produces bounded JSON Schemas for tools
 registered with `document.modelContext.registerTool`. Device records implement a
 least-privilege `grapevine.care.device.v1` adapter. OpenAI Sites packages and
 hosts the project.
@@ -37,9 +39,11 @@ hosts the project.
 
 Without WebMCP, an agent would scrape cards, infer status colors, and click
 controls meant for people. Grapevine Care exposes the exact evidence model and
-workflow boundary: observation time, provenance, uncertainty, read-only
-capabilities, and a single approval-gated preparation tool. The agent can help
-without pretending it dispensed medication or contacted a caregiver.
+workflow boundary: actor identity, evidence class, observation time, trust
+boundary, plan version, uncertainty, and state-dependent capabilities. The
+server rejects stale evidence and the page removes preparation tools during
+human decisions. The agent can coordinate without pretending it dispensed
+medication, answered for Rose, or contacted a caregiver.
 
 ## Challenges
 
@@ -53,7 +57,11 @@ the interface.
 - A deterministic, resettable judge flow.
 - Isolated browser runs that prevent cross-judge state contamination.
 - Server-enforced single confirmation, idempotent staging, and single review.
-- Five read-only tools and one idempotent, approval-gated write tool.
+- A resident evidence-resolution loop where only Rose can respond.
+- Snapshot-bound tool ordering that forces re-observation after state changes.
+- Dynamic WebMCP capabilities that appear and disappear with workflow state.
+- Structured chain-of-custody provenance and signed care-plan source identity.
+- Safe, idempotent device diagnostics without remote-control authority.
 - Explicit uncertainty for missed windows and stale devices.
 - Elder, caregiver, and device/MCP surfaces in one shared application.
 - A capability adapter that can support future equipment without granting

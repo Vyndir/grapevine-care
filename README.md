@@ -22,8 +22,8 @@ for professional care.
 
 ## WebMCP collaboration model
 
-Grapevine Care registers six page-scoped tools directly with
-`document.modelContext.registerTool(...)`:
+Grapevine Care defines eight bounded tools and exposes only the subset appropriate
+to the current human workflow state through `document.modelContext.registerTool(...)`:
 
 | Tool | Agent contribution | Boundary |
 | --- | --- | --- |
@@ -31,8 +31,15 @@ Grapevine Care registers six page-scoped tools directly with
 | `get_medication_schedule` | Reads fictional medication windows and confirmation states | Cannot change the plan or release medication |
 | `get_inventory_forecast` | Calculates days remaining from units and daily cadence | Cannot order or request a prescription |
 | `get_device_capabilities` | Discovers least-privilege capabilities across device adapters | No agent-facing release or biometric capability |
-| `get_care_evidence` | Reads a bounded event trail with source and uncertainty | Device data is marked untrusted |
-| `prepare_caregiver_check_in` | Stages a call, visit, or message for review | No one is contacted until a person approves; the demo has no external messaging integration |
+| `get_care_evidence` | Returns a compact chain of custody and current snapshot ID | Later preparation fails if evidence changes |
+| `prepare_resident_check_in` | Places one bounded question on Rose’s station | The agent cannot answer for Rose or interpret her response as medication proof |
+| `prepare_caregiver_check_in` | Stages a call, visit, or message from a current snapshot | No one is contacted until a person approves; the demo has no external messaging integration |
+| `request_device_health_snapshot` | Requests a fresh non-clinical diagnostic | Cannot control the device or return clinical readings |
+
+The capability set is state-dependent. During a pending resident response or
+caregiver review, preparation tools disappear. Every human or device
+contribution increments an evidence version, making earlier snapshot IDs stale
+and forcing the agent to observe again before it can prepare the next step.
 
 The deterministic device controller—not the AI—enforces schedule windows,
 duplicate-release prevention, door state, and local confirmation. The AI cannot
@@ -45,18 +52,22 @@ diagnose, determine that an emergency exists, or contact emergency services.
 2. In the **Judge demo** bar, select **Missed window**.
 3. Ask ChatGPT:
 
-   > Use only this page’s WebMCP tools. Review Rose’s current care overview,
-   > medication schedule, recent evidence, inventory forecast, and connected
-   > device capabilities. Explain what is known and what remains uncertain.
-   > If a caregiver check-in is justified, prepare a call using the
-   > idempotency key `judge-missed-window-call-01`. Do not claim anyone has
-   > been contacted, do not diagnose, and stop for human approval.
+   > Rose’s medication window passed and I cannot tell what actually happened.
+   > Use this page’s tools to determine what the system knows, safely resolve
+   > any missing information you can, and help prepare the appropriate human
+   > next step. Do not diagnose, recommend a medication decision, answer for
+   > Rose, or claim anyone was contacted.
 
-4. ChatGPT should call the five read-only tools and then
-   `prepare_caregiver_check_in`.
-5. The visible review drawer opens. Confirm that it states **No one has been
+4. ChatGPT should inspect current evidence, receive an `evidence_snapshot_id`,
+   and call `prepare_resident_check_in`. A question appears on Rose’s station.
+5. Switch to **Resident** and let Rose choose one bounded response. The agent
+   cannot press these controls. The old evidence snapshot is now stale.
+6. Ask ChatGPT to continue. It must call `get_care_evidence` again before
+   `prepare_caregiver_check_in` becomes valid.
+7. The visible review drawer opens. Confirm that it states **No one has been
    contacted**, then approve or dismiss the simulated action.
-6. Switch to **Devices & MCP** to show the extensible adapter model and tool
+8. Switch to **Devices & MCP** to show the changing capability set, evidence
+   chain of custody, signed care-plan provenance, and safe device diagnostic.
    boundaries. Use the reset control to return to the deterministic starting
    state.
 
@@ -67,8 +78,12 @@ This project is designed for the OpenAI WebMCP Challenge:
 - It is a working web application with imperative WebMCP tools and JSON Schema
   inputs.
 - The human and agent operate in the same visible interface.
-- Five tools are read-only; the only state-changing tool stages a reversible,
-  approval-gated action with an idempotency key.
+- Capabilities appear and disappear with the workflow; pending human decisions
+  remove agent preparation tools.
+- Snapshot binding server-enforces the sequence observe → request evidence →
+  re-observe → prepare → human decides.
+- Resident and device contributions are structured by actor, evidence class,
+  observed time, trust boundary, and care-plan version.
 - Tool outputs contain source, observation time, calculation details, and
   explicit uncertainty.
 - The demo has deterministic scenarios and a one-click reset for reliable

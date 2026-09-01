@@ -22,13 +22,25 @@ export const getDeviceCapabilitiesArgsSchema = z.object({
 });
 export const getCareEvidenceArgsSchema = z.object({
   resident_id: residentIdSchema,
-  event_limit: z.optional(z.number().check(z.minimum(1), z.maximum(20), z.describe("Maximum evidence events to return. Defaults to 8.")))
+  event_limit: z.optional(z.number().check(z.minimum(1), z.maximum(8), z.describe("Maximum compact evidence records to return. Defaults to 5.")))
+});
+export const prepareResidentCheckInArgsSchema = z.object({
+  resident_id: residentIdSchema,
+  prompt: z.string().check(z.trim(), z.minLength(8), z.maxLength(180), z.describe("Short, non-clinical check-in shown on Rose's station.")),
+  evidence_snapshot_id: z.string().check(z.trim(), z.minLength(12), z.maxLength(96), z.describe("Current snapshot returned by get_care_evidence.")),
+  idempotency_key: z.string().check(z.trim(), z.minLength(8), z.maxLength(80), z.describe("Unique key preventing duplicate resident cards."))
 });
 export const prepareCaregiverCheckInArgsSchema = z.object({
   resident_id: residentIdSchema,
   channel: z.enum(["call", "visit", "message"]).check(z.describe("Proposed caregiver check-in channel. This is staged only and is never sent automatically.")),
   reason: z.string().check(z.trim(), z.minLength(8), z.maxLength(240), z.describe("Concise evidence-based reason for a caregiver to review.")),
+  evidence_snapshot_id: z.string().check(z.trim(), z.minLength(12), z.maxLength(96), z.describe("Current snapshot returned by get_care_evidence.")),
   idempotency_key: z.string().check(z.trim(), z.minLength(8), z.maxLength(80), z.describe("Unique caller-generated key that prevents duplicate staged actions."))
+});
+export const requestDeviceHealthSnapshotArgsSchema = z.object({
+  resident_id: residentIdSchema,
+  device_id: z.string().check(z.trim(), z.minLength(3), z.maxLength(64), z.describe("Registered device identifier.")),
+  idempotency_key: z.string().check(z.trim(), z.minLength(8), z.maxLength(80), z.describe("Unique key preventing duplicate diagnostic records."))
 });
 
 export const toolInputSchemas = {
@@ -37,7 +49,9 @@ export const toolInputSchemas = {
   getInventoryForecast: z.toJSONSchema(getInventoryForecastArgsSchema, { target: "draft-07", io: "input" }),
   getDeviceCapabilities: z.toJSONSchema(getDeviceCapabilitiesArgsSchema, { target: "draft-07", io: "input" }),
   getCareEvidence: z.toJSONSchema(getCareEvidenceArgsSchema, { target: "draft-07", io: "input" }),
-  prepareCaregiverCheckIn: z.toJSONSchema(prepareCaregiverCheckInArgsSchema, { target: "draft-07", io: "input" })
+  prepareResidentCheckIn: z.toJSONSchema(prepareResidentCheckInArgsSchema, { target: "draft-07", io: "input" }),
+  prepareCaregiverCheckIn: z.toJSONSchema(prepareCaregiverCheckInArgsSchema, { target: "draft-07", io: "input" }),
+  requestDeviceHealthSnapshot: z.toJSONSchema(requestDeviceHealthSnapshotArgsSchema, { target: "draft-07", io: "input" })
 } as const;
 
 export function parseArgs<Schema extends z.ZodMiniType>(schema: Schema, input: unknown): z.output<Schema> {
@@ -51,8 +65,13 @@ export type DoseStatus = "ready" | "upcoming" | "confirmed" | "missed" | "blocke
 export type CareSeverity = "routine" | "attention" | "urgent";
 export type Resident = { id: string; display_name: string; timezone: string; simulated_time: string; scenario: Scenario; severity: CareSeverity; };
 export type Dose = { id: string; resident_id: string; label: string; scheduled_time: string; window_label: string; compartment: string; status: DoseStatus; confirmed_at: string | null; };
-export type CareDevice = { id: string; resident_id: string; name: string; device_type: "medication_dispenser" | "fall_sensor" | "blood_pressure_cuff"; status: "online" | "offline" | "attention"; battery_percent: number; firmware: string; capabilities: string[]; door_state: "closed" | "open" | "not_applicable"; last_seen: string; };
+export type CareDevice = { id: string; resident_id: string; name: string; device_type: "medication_dispenser" | "fall_sensor" | "blood_pressure_cuff"; status: "online" | "offline" | "attention"; battery_percent: number; firmware: string; capabilities: string[]; door_state: "closed" | "open" | "not_applicable"; last_seen: string; sensor_health: "nominal" | "attention" | "unavailable"; applied_plan_version: string | null; };
 export type Inventory = { resident_id: string; units_remaining: number; daily_cadence: number; updated_at: string; };
-export type CareEvent = { id: string; resident_id: string; event_type: string; severity: CareSeverity; summary: string; detail: string; source: string; occurred_at: string; };
-export type PreparedAction = { id: string; resident_id: string; channel: "call" | "visit" | "message"; reason: string; status: "awaiting_human_approval" | "approved_in_demo" | "dismissed"; idempotency_key: string; created_at: string; resolved_at: string | null; };
-export type CareState = { fictional: true; demo_run_id: string; resident: Resident; doses: Dose[]; devices: CareDevice[]; inventory: Inventory; events: CareEvent[]; actions: PreparedAction[]; safety_contract: { ai_may: string[]; ai_may_not: string[]; emergency_notice: string; }; };
+export type EvidenceActorType = "device" | "resident" | "caregiver" | "care_team" | "agent" | "system";
+export type EvidenceType = "observation" | "self_report" | "plan_record" | "prepared_action" | "human_decision" | "diagnostic";
+export type CareEvent = { id: string; resident_id: string; event_type: string; severity: CareSeverity; summary: string; detail: string; source: string; occurred_at: string; actor_type: EvidenceActorType; actor_id: string; evidence_type: EvidenceType; observed_at: string; recorded_at: string; trust_boundary: string; plan_version: string | null; };
+export type ResidentResponseCode = "im_okay" | "not_sure" | "contact_caregiver";
+export type ResidentCheckIn = { id: string; resident_id: string; prompt: string; status: "awaiting_resident" | "responded"; response_code: ResidentResponseCode | null; evidence_snapshot_id: string; idempotency_key: string; created_at: string; responded_at: string | null; };
+export type PreparedAction = { id: string; resident_id: string; channel: "call" | "visit" | "message"; reason: string; status: "awaiting_human_approval" | "approved_in_demo" | "dismissed"; evidence_snapshot_id: string | null; idempotency_key: string; created_at: string; resolved_at: string | null; };
+export type CarePlanProvenance = { version: string; effective_at: string; authorized_by: string; authorization_role: string; device_applied_version: string | null; alignment: "aligned" | "mismatch"; };
+export type CareState = { fictional: true; demo_run_id: string; evidence_version: number; resident: Resident; doses: Dose[]; devices: CareDevice[]; inventory: Inventory; events: CareEvent[]; resident_check_ins: ResidentCheckIn[]; actions: PreparedAction[]; care_plan: CarePlanProvenance; safety_contract: { ai_may: string[]; ai_may_not: string[]; emergency_notice: string; }; };

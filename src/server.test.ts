@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import worker from "./server";
-import type { CareState, PreparedAction, Scenario } from "./schemas";
+import type { CareState, PreparedAction, ResidentCheckIn, Scenario } from "./schemas";
 
 class TestStatement {
   constructor(private database: DatabaseSync, private sql: string, private bindings: SQLInputValue[] = []) {}
@@ -35,6 +35,7 @@ class TestD1 {
   migrate() {
     this.sqlite.exec(readFileSync(new URL("../drizzle/0001_grapevine_care.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0002_demo_run_isolation.sql", import.meta.url), "utf8"));
+    this.sqlite.exec(readFileSync(new URL("../drizzle/0003_evidence_resolution_loop.sql", import.meta.url), "utf8"));
   }
   close() { this.sqlite.close(); }
 }
@@ -69,6 +70,22 @@ async function scenario(runId: string, next: Scenario) {
   return call(runId, "/api/care/scenario", { method: "POST", body: JSON.stringify({ scenario: next }) });
 }
 
+async function snapshot(runId: string) {
+  const response = await call(runId, "/api/care/evidence-snapshot", { method: "POST", body: JSON.stringify({ resident_id: "rose-demo", event_limit: 5 }) });
+  expect(response.status).toBe(200);
+  return response.json() as Promise<{ evidence_snapshot_id: string; evidence_version: number }>;
+}
+
+async function resolveResidentEvidence(runId: string) {
+  const current = await snapshot(runId);
+  const preparedResponse = await call(runId, "/api/care/resident-check-ins", { method: "POST", body: JSON.stringify({ resident_id: "rose-demo", prompt: "Your care circle wants to check in. Are you okay?", evidence_snapshot_id: current.evidence_snapshot_id, idempotency_key: "resident-loop-001" }) });
+  expect(preparedResponse.status).toBe(200);
+  const prepared = await preparedResponse.json() as { check_in: ResidentCheckIn };
+  const response = await call(runId, `/api/care/resident-check-ins/${prepared.check_in.id}/respond`, { method: "POST", body: JSON.stringify({ response_code: "im_okay" }) });
+  expect(response.status).toBe(200);
+  return prepared.check_in;
+}
+
 describe("Grapevine Care server invariants", () => {
   it("requires a bounded isolated demo-run identifier", async () => {
     expect((await call(null, "/api/care/state")).status).toBe(400);
@@ -90,7 +107,8 @@ describe("Grapevine Care server invariants", () => {
   it("performs a complete deterministic reset", async () => {
     await state(runA);
     await call(runA, "/api/care/doses/dose-am/confirm", { method: "POST", body: "{}" });
-    await call(runA, "/api/care/actions", { method: "POST", body: JSON.stringify({ resident_id: "rose-demo", channel: "call", reason: "Review the missed confirmation with Rose.", idempotency_key: "reset-action-001" }) });
+    const current = await snapshot(runA);
+    await call(runA, "/api/care/actions", { method: "POST", body: JSON.stringify({ resident_id: "rose-demo", channel: "call", reason: "Review the current evidence with Rose.", evidence_snapshot_id: current.evidence_snapshot_id, idempotency_key: "reset-action-001" }) });
     await scenario(runA, "missed_window");
     const reset = await state(runA);
     expect(reset.inventory.units_remaining).toBe(24);
@@ -114,7 +132,8 @@ describe("Grapevine Care server invariants", () => {
 
   it("deduplicates prepared actions and their evidence events", async () => {
     await state(runA);
-    const body = JSON.stringify({ resident_id: "rose-demo", channel: "call", reason: "Review the missed confirmation with Rose.", idempotency_key: "duplicate-action-001" });
+    const current = await snapshot(runA);
+    const body = JSON.stringify({ resident_id: "rose-demo", channel: "call", reason: "Review the current evidence with Rose.", evidence_snapshot_id: current.evidence_snapshot_id, idempotency_key: "duplicate-action-001" });
     const first = await (await call(runA, "/api/care/actions", { method: "POST", body })).json() as { action: PreparedAction; duplicate_prevented: boolean };
     const second = await (await call(runA, "/api/care/actions", { method: "POST", body })).json() as { action: PreparedAction; duplicate_prevented: boolean };
     expect(second.action.id).toBe(first.action.id);
@@ -125,19 +144,57 @@ describe("Grapevine Care server invariants", () => {
 
   it("resolves an action once using the simulated timeline", async () => {
     await scenario(runA, "missed_window");
-    const prepared = await (await call(runA, "/api/care/actions", { method: "POST", body: JSON.stringify({ resident_id: "rose-demo", channel: "visit", reason: "Review Rose's care evidence in person.", idempotency_key: "resolve-action-001" }) })).json() as { action: PreparedAction };
+    await resolveResidentEvidence(runA);
+    const current = await snapshot(runA);
+    const prepared = await (await call(runA, "/api/care/actions", { method: "POST", body: JSON.stringify({ resident_id: "rose-demo", channel: "visit", reason: "Review Rose's care evidence in person.", evidence_snapshot_id: current.evidence_snapshot_id, idempotency_key: "resolve-action-001" }) })).json() as { action: PreparedAction };
     const path = `/api/care/actions/${prepared.action.id}/resolve`;
     const first = await (await call(runA, path, { method: "POST", body: JSON.stringify({ resolution: "approved_in_demo" }) })).json() as { already_resolved: boolean; state: CareState };
     const second = await (await call(runA, path, { method: "POST", body: JSON.stringify({ resolution: "approved_in_demo" }) })).json() as { already_resolved: boolean; state: CareState };
     expect(first.already_resolved).toBe(false);
     expect(second.already_resolved).toBe(true);
     expect(second.state.events.filter((event) => event.event_type === "prepared_action_reviewed")).toHaveLength(1);
-    expect(second.state.actions[0].resolved_at).toBe("2026-08-31T09:36:00-04:00");
+    expect(second.state.actions[0].resolved_at).toBe(second.state.resident.simulated_time);
+  });
+
+  it("forces re-observation after Rose contributes evidence", async () => {
+    await scenario(runA, "missed_window");
+    const old = await snapshot(runA);
+    const prepared = await (await call(runA, "/api/care/resident-check-ins", { method: "POST", body: JSON.stringify({ resident_id: "rose-demo", prompt: "Your care circle wants to check in. Are you okay?", evidence_snapshot_id: old.evidence_snapshot_id, idempotency_key: "stale-resident-001" }) })).json() as { check_in: ResidentCheckIn };
+    await call(runA, `/api/care/resident-check-ins/${prepared.check_in.id}/respond`, { method: "POST", body: JSON.stringify({ response_code: "contact_caregiver" }) });
+    const stale = await call(runA, "/api/care/actions", { method: "POST", body: JSON.stringify({ resident_id: "rose-demo", channel: "call", reason: "Rose requested a caregiver check-in.", evidence_snapshot_id: old.evidence_snapshot_id, idempotency_key: "stale-action-001" }) });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ stale_evidence: true });
+    const current = await snapshot(runA);
+    expect(current.evidence_version).toBeGreaterThan(old.evidence_version);
+    const fresh = await call(runA, "/api/care/actions", { method: "POST", body: JSON.stringify({ resident_id: "rose-demo", channel: "call", reason: "Rose requested a caregiver check-in.", evidence_snapshot_id: current.evidence_snapshot_id, idempotency_key: "fresh-action-001" }) });
+    expect(fresh.status).toBe(200);
+  });
+
+  it("records Rose's answer as bounded self-report evidence", async () => {
+    await scenario(runA, "missed_window");
+    await resolveResidentEvidence(runA);
+    const current = await state(runA);
+    const selfReport = current.events.find((event) => event.event_type === "resident_self_report");
+    expect(selfReport).toMatchObject({ actor_type: "resident", actor_id: "rose-demo", evidence_type: "self_report", trust_boundary: "resident_self_report_not_clinical_verification" });
+    expect(selfReport?.detail).toContain("does not resolve the medication-removal");
+    expect(current.doses[0].status).toBe("missed");
+  });
+
+  it("requests idempotent non-clinical device diagnostics without control", async () => {
+    await scenario(runA, "device_offline");
+    const body = JSON.stringify({ resident_id: "rose-demo", device_id: "device-pillbox", idempotency_key: "device-check-001" });
+    const first = await (await call(runA, "/api/care/device-health-snapshots", { method: "POST", body })).json() as { evidence_changed: boolean; diagnostic: { status: string }; duplicate_prevented: boolean };
+    const second = await (await call(runA, "/api/care/device-health-snapshots", { method: "POST", body })).json() as { evidence_changed: boolean; duplicate_prevented: boolean };
+    expect(first.diagnostic.status).toBe("offline");
+    expect(first.evidence_changed).toBe(true);
+    expect(second.evidence_changed).toBe(false);
+    expect(second.duplicate_prevented).toBe(true);
+    expect((await state(runA)).events.filter((event) => event.event_type === "device_health_snapshot")).toHaveLength(1);
   });
 
   it("rejects unsafe channels and oversized bodies", async () => {
     await state(runA);
-    const unsafe = await call(runA, "/api/care/actions", { method: "POST", body: JSON.stringify({ resident_id: "rose-demo", channel: "dispatch_emergency_services", reason: "Attempt an unsafe external action.", idempotency_key: "unsafe-action-001" }) });
+    const unsafe = await call(runA, "/api/care/actions", { method: "POST", body: JSON.stringify({ resident_id: "rose-demo", channel: "dispatch_emergency_services", reason: "Attempt an unsafe external action.", evidence_snapshot_id: "snapshot-invalid-001", idempotency_key: "unsafe-action-001" }) });
     expect(unsafe.status).toBe(400);
     const oversized = await call(runA, "/api/care/actions", { method: "POST", body: JSON.stringify({ payload: "x".repeat(5000) }) });
     expect(oversized.status).toBe(413);
