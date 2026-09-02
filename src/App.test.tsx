@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import type { CareState, CareTeamHandoff, PreparedAction } from "./schemas";
@@ -97,15 +97,21 @@ function installFetch() {
 
 beforeEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); installFetch(); });
 
+function selectScenario(scenario: "on_schedule" | "missed_window" | "care_story") {
+  fireEvent.change(screen.getByLabelText("Demo scenario"), { target: { value: scenario } });
+}
+
 describe("Grapevine Care", () => {
   it("opens with the caregiver job and keeps Rose's large-touch view one click away", async () => {
     const tools = installModelContext();
     render(<App />);
     expect(await screen.findByRole("heading", { name: "Keep Rose’s care moving—without losing context." })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Caregiver cockpit" })).toHaveClass("active");
+    expect(screen.getByRole("button", { name: "Caregiver workspace" })).toHaveClass("active");
+    expect(within(screen.getByRole("navigation", { name: "Caregiver workflow views" })).getAllByRole("button").map((button) => button.textContent)).toEqual(["Today", "My shift", "Handoff"]);
+    expect(screen.getByRole("combobox", { name: "Demo scenario" })).toHaveValue("coverage_callout");
     await waitFor(() => expect(tools.has("get_shift_context") && tools.has("get_coverage_candidates") && tools.has("prepare_shift_coverage")).toBe(true));
-    fireEvent.click(screen.getByRole("button", { name: "Reset demo" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Rose’s view" }));
+    selectScenario("on_schedule");
+    fireEvent.click(await screen.findByRole("button", { name: "Rose’s station" }));
     expect(await screen.findByRole("heading", { name: "Good morning, Rose." })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Verify locally/i })).toBeEnabled();
     await waitFor(() => expect(tools.size).toBe(7));
@@ -117,7 +123,7 @@ describe("Grapevine Care", () => {
   it("shows explicit uncertainty after the missed-window scenario", async () => {
     render(<App />);
     await screen.findByText("Keep Rose’s care moving—without losing context.");
-    fireEvent.click(screen.getByRole("button", { name: "Missed window" }));
+    selectScenario("missed_window");
     expect(await screen.findByRole("heading", { name: "Rose’s care routine needs attention" })).toBeInTheDocument();
     expect(screen.getByText(/without assuming ingestion/i)).toBeInTheDocument();
   });
@@ -126,16 +132,16 @@ describe("Grapevine Care", () => {
     const tools = installModelContext();
     render(<App />);
     await screen.findByText("Keep Rose’s care moving—without losing context.");
-    fireEvent.click(screen.getByRole("button", { name: "Missed window" }));
+    selectScenario("missed_window");
     await waitFor(() => expect(tools.has("prepare_resident_check_in")).toBe(true));
     const evidence = await tools.get("get_care_evidence")!.execute({ resident_id: "rose-demo" }) as { evidence_snapshot_id: string };
     await act(async () => { await tools.get("prepare_resident_check_in")!.execute({ resident_id: "rose-demo", prompt: "Your care circle wants to check in. Are you okay?", evidence_snapshot_id: evidence.evidence_snapshot_id, idempotency_key: "resident-check-001" }); });
-    fireEvent.click(screen.getByRole("button", { name: "Rose’s view" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rose’s station" }));
     expect(await screen.findByRole("heading", { name: "Your care circle wants to check in. Are you okay?" })).toBeInTheDocument();
     expect(tools.has("prepare_resident_check_in")).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "I'm okay" }));
     expect(await screen.findByText("Thank you, Rose.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Reset demo" }));
+    selectScenario("on_schedule");
     await waitFor(() => expect(tools.has("prepare_caregiver_check_in")).toBe(true));
   });
 
@@ -143,7 +149,7 @@ describe("Grapevine Care", () => {
     const tools = installModelContext();
     render(<App />);
     await screen.findByText("Keep Rose’s care moving—without losing context.");
-    fireEvent.click(screen.getByRole("button", { name: "Reset demo" }));
+    selectScenario("on_schedule");
     await waitFor(() => expect(tools.has("prepare_caregiver_check_in")).toBe(true));
     const evidence = await tools.get("get_care_evidence")!.execute({ resident_id: "rose-demo" }) as { evidence_snapshot_id: string };
     await act(async () => { await tools.get("prepare_caregiver_check_in")!.execute({ resident_id: "rose-demo", channel: "call", reason: "The current evidence needs caregiver review.", evidence_snapshot_id: evidence.evidence_snapshot_id, idempotency_key: "test-action-001" }); });
@@ -155,7 +161,7 @@ describe("Grapevine Care", () => {
     const tools = installModelContext();
     render(<App />);
     await screen.findByText("Keep Rose’s care moving—without losing context.");
-    fireEvent.click(screen.getByRole("button", { name: "72-hour story" }));
+    selectScenario("care_story");
     expect(await screen.findByRole("heading", { name: "How Rose has been doing, relative to Rose" })).toBeInTheDocument();
     expect(screen.getByText(/Two care-plan signals now require human review/i)).toBeInTheDocument();
     await waitFor(() => expect(tools.has("get_resident_context") && tools.has("get_care_story") && tools.has("prepare_care_team_review")).toBe(true));
@@ -173,7 +179,7 @@ describe("Grapevine Care", () => {
   it("makes device capability boundaries visible", async () => {
     render(<App />);
     await screen.findByText("Keep Rose’s care moving—without losing context.");
-    fireEvent.click(screen.getByRole("button", { name: "Devices & MCP" }));
+    fireEvent.click(screen.getByRole("button", { name: "How WebMCP works" }));
     expect(screen.getByRole("heading", { name: "A safe control plane for connected care" })).toBeInTheDocument();
     expect(screen.getByText("compartment.release.local_only")).toBeInTheDocument();
     expect(screen.getByText("Release medication")).toBeInTheDocument();

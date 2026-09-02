@@ -76,7 +76,7 @@ The loop now reads entirely complete:
 
 ## 2:31–2:50 — WebMCP and device boundaries
 
-Open **Devices & MCP**. Show the state-dependent tool list and
+Open **How WebMCP works**. Show the state-dependent tool list and
 `grapevine.care.device.v1` adapter.
 
 “The same architecture can accept evidence from future equipment, but a device

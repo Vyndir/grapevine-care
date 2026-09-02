@@ -66,11 +66,12 @@ order observable to judges.
 
 ## Product surfaces
 
-- **Caregiver cockpit** opens first with Today, Schedule, My Shift, Handoffs,
-  Story, and Care Plan. It models the caregiver's job and continuity loop.
-- **Rose's view** preserves the calm, large-touch resident medication station and
+- **Caregiver workspace** opens first with a focused Today, My Shift, and Handoff
+  journey. Schedule, recent context, and the signed plan remain available as
+  supporting disclosures inside the caregiver workflow.
+- **Rose's station** preserves the calm, large-touch resident medication station and
   bounded self-report flow.
-- **Devices & MCP** shows current tools, evidence boundaries, signed-plan
+- **How WebMCP works** shows current tools, evidence boundaries, signed-plan
   provenance, and the extensible `grapevine.care.device.v1` adapter.
 
 ## Three-minute judge path
@@ -83,7 +84,7 @@ order observable to judges.
    explicit “do not infer” boundaries. Start and complete the compressed visit.
 5. Prepare the handoff to Luis. Show that Luis cannot see it until Jordan
    approves, then acknowledge it as Luis.
-6. Open **Devices & MCP** to show the state-dependent tool surface.
+6. Open **How WebMCP works** to show the state-dependent tool surface.
 
 Close with: **“Care doesn't happen in one shift. Grapevine makes sure context
 doesn't end when the shift does.”**

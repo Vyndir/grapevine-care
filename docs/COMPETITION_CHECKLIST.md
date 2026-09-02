@@ -21,7 +21,7 @@ Verified against the official challenge and Devpost rules on August 31, 2026.
 - [x] Agent-readable longitudinal care brief with unresolved questions
 - [x] Snapshot-bound nurse review with server-enforced plan threshold
 - [x] Nurse review and operational shift handoff separated into non-overlapping workflows
-- [x] Caregiver-first cockpit with Today, Schedule, My Shift, Handoffs, Story, and Care Plan
+- [x] Caregiver-first workspace with a focused Today → My Shift → Handoff path and contextual supporting detail
 - [x] Full call-out recovery loop from disruption through recipient acknowledgement
 - [x] Deterministic eight-constraint caregiver eligibility with no opaque ranking score
 - [x] Schedule-snapshot binding and stale-shift rejection

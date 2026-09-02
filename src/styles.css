@@ -34,12 +34,12 @@ button { cursor: pointer; }
 .demo-bar > div:first-child > span { display: inline-flex; align-items: center; gap: 6px; color: #284b3f; font-size: 11px; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
 .demo-bar > div:first-child svg { width: 15px; height: 15px; }
 .demo-bar p { margin: 0; color: #728078; font-size: 11px; }
-.scenario-controls { display: flex; align-items: center; gap: 5px; }
-.scenario-controls button { min-height: 31px; padding: 0 10px; border: 1px solid transparent; border-radius: 9px; color: #6b7b73; background: transparent; font-size: 11px; font-weight: 750; }
-.scenario-controls button:hover { background: rgba(255,255,255,.55); }
-.scenario-controls button.active { border-color: #c5d5cc; color: #285b49; background: #fffefa; }
-.scenario-controls .reset-button { width: 31px; padding: 0; display: grid; place-items: center; border-color: #d5d5ca; background: #fffefa; }
-.scenario-controls .reset-button svg { width: 15px; height: 15px; }
+.scenario-picker { display: flex; align-items: end; gap: 7px; }
+.scenario-picker label { display: grid; gap: 3px; }
+.scenario-picker label > span { color: #76847d; font-size: 8px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.scenario-picker select { min-width: 190px; height: 34px; padding: 0 32px 0 10px; border: 1px solid #cbd2cd; border-radius: 9px; color: #285b49; background: #fffefa; font: inherit; font-size: 11px; font-weight: 750; }
+.scenario-picker .reset-button { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; border: 1px solid #d5d5ca; border-radius: 9px; color: #5d7067; background: #fffefa; }
+.scenario-picker .reset-button svg { width: 15px; height: 15px; }
 
 .care-layout { width: min(1460px, 100%); margin: 0 auto; padding: clamp(28px, 4vw, 48px) clamp(20px, 3vw, 42px); display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, .68fr); gap: 30px; }
 .welcome-row { margin-bottom: 28px; display: flex; align-items: end; justify-content: space-between; gap: 20px; }
@@ -245,6 +245,16 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .continuity-loop .current { color: #755817; }
 .continuity-loop .current i { color: #674b12; background: #efd994; box-shadow: 0 0 0 4px #fbf1d3; }
 .continuity-tabs { margin-bottom: 20px; }
+.context-disclosure { margin-top: 16px; border: 1px solid #d8d9d0; border-radius: 18px; background: #fffefa; }
+.context-disclosure > summary { min-height: 66px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; color: #294a3e; cursor: pointer; list-style: none; }
+.context-disclosure > summary::-webkit-details-marker { display: none; }
+.context-disclosure > summary span { display: grid; gap: 4px; }
+.context-disclosure > summary strong { font-size: 13px; }
+.context-disclosure > summary small { color: #74827a; font-size: 10px; }
+.context-disclosure > summary b { color: #76847d; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
+.context-disclosure[open] > summary { border-bottom: 1px solid #e0e1da; }
+.context-disclosure > :not(summary) { margin: 18px; }
+.context-disclosure > .story-stack, .context-disclosure > .plan-stack { margin: 18px; }
 .continuity-card { padding: clamp(22px, 3vw, 30px); border: 1px solid #d8d9d0; border-radius: 23px; background: #fffefa; }
 .continuity-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, .68fr); gap: 16px; }
 .callout-card { border-color: #d9c27c; background: #fffdf6; }
@@ -406,8 +416,9 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .demo-bar { align-items: start; flex-direction: column; }
   .demo-bar > div:first-child { width: 100%; justify-content: space-between; }
   .demo-bar p { display: none; }
-  .scenario-controls { width: 100%; overflow-x: auto; padding-bottom: 3px; }
-  .scenario-controls button { flex: none; }
+  .scenario-picker { width: 100%; }
+  .scenario-picker label { flex: 1; }
+  .scenario-picker select { width: 100%; min-width: 0; }
   .attention-panel { grid-template-columns: 1fr; }
   .attention-panel dl { grid-template-columns: 1fr; }
   .workspace-heading { align-items: start; flex-direction: column; }
