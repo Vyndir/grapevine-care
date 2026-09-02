@@ -29,14 +29,14 @@ diminish either contributor's authorship or licensing rights.
 - The data model was rebuilt around fictional residents, medication windows,
   inventory, connected-care devices, evidence events, and prepared actions.
 - The interface was redesigned as three healthcare-specific surfaces: an
-  elder-friendly resident station, a caregiver evidence workspace, and a
+  elder-friendly resident station, a caregiver continuity workspace, and a
   device/WebMCP control-plane view.
-- The demo state became four deterministic medication-support scenarios with a
-  one-click reset: on schedule, missed window, door fault, and device offline.
+- The demo state became deterministic caregiver-continuity, longitudinal-story,
+  and medication/device scenarios with one-click reset.
 
 ## New WebMCP contract
 
-Grapevine Care defines eleven healthcare-specific tools and exposes only the
+Grapevine Care defines seventeen healthcare-specific tools and exposes only the
 subset appropriate to the current human workflow state:
 
 1. `get_care_overview`
@@ -50,6 +50,12 @@ subset appropriate to the current human workflow state:
 9. `get_resident_context`
 10. `get_care_story`
 11. `prepare_care_team_review`
+12. `get_shift_context`
+13. `get_coverage_candidates`
+14. `prepare_shift_coverage`
+15. `get_changes_since_last_shift`
+16. `get_shift_brief`
+17. `prepare_shift_handoff`
 
 These are not renamed disaster-logistics operations. They use a distinct care
 evidence model, a resident evidence-resolution loop, versioned evidence
@@ -69,7 +75,7 @@ not exposed to agents.
 - Live application: https://grapevine-care.miles-g.chatgpt.site/
 - Package: `grapevine-care-webmcp`
 - Database and migrations: `grapevine-care` / `drizzle/0001_grapevine_care.sql`
-  through `drizzle/0004_longitudinal_care_story.sql`
+  through `drizzle/0005_caregiver_continuity_loop.sql`
 - Architecture, safety case, demo script, submission copy, competition
   checklist, and evaluation matrix are maintained within this repository.
 

@@ -1,85 +1,99 @@
 # Three-minute demo script
 
-## 0:00–0:12 — WebMCP immediately
+## 0:00–0:15 — The caregiver's real problem
 
-The application opens with **72-hour story** active in the **Caregiver
-cockpit**. Ask:
+Open the public site on the default **Caregiver call-out** scenario.
 
-> How has Rose been doing over the last 72 hours? Compare her story with her
-> signed monitoring plan and personal baseline. Explain what is known and still
-> unresolved. If the authorized criteria are met, prepare the appropriate human
-> care-team review. Do not diagnose or claim anything was sent.
+“It is 2:15 PM. Maya just called out for Rose's 5:00 PM visit. Care does not
+pause, and the replacement caregiver cannot arrive without the context the shift
+requires.”
 
-Show `get_resident_context` and `get_care_story` within the first seconds.
-Later, use **Rose’s view** to show that the resident surface is intentionally
-calm and simple while the caregiver surface carries operational context.
+Show the six-step continuity loop and the explicit scheduler authority.
 
-## 0:12–0:37 — Rose is a person, not an alert
+## 0:15–0:48 — WebMCP resolves coverage safely
 
-Open **Care Plan**: Rose is 79, lives independently, has documented routines and
-preferences, and Nurse Ava authored the fictional monitoring rules.
+Ask ChatGPT:
 
-“The agent does not invent what matters medically. The care team defines what
-to watch; WebMCP gives the agent structured, source-labeled context.”
+> Rose's 5 PM shift lost coverage. Use this page's tools to inspect the shift,
+> evaluate every caregiver against the explicit constraints, explain every
+> exclusion and tradeoff, and prepare the eligible option for scheduler review.
+> Do not assign anyone, use an opaque score, or infer suitability from sensitive
+> traits.
 
-## 0:37–1:08 — Three days become a care story
+Show `get_shift_context`, `get_coverage_candidates`, and
+`prepare_shift_coverage`. Point out that Jordan is the only eligible option;
+Maya is unavailable, Luis lacks a feasible travel window, and Elena lacks Rose
+orientation and Care Plan v4 acknowledgement.
 
-Open **Story**. Show Day 1 routine confirmations; Day 2 unconfirmed window,
-Rose's “I'm okay” self-report, and resumed activity; then Day 3's second gap and
-later-than-baseline movement.
+## 0:48–1:05 — A person changes the schedule
 
-“Rose's response is useful resident evidence, but it does not prove medication
-ingestion. Presence data is context, not a welfare or clinical conclusion.”
+The scheduler drawer opens. Show:
 
-## 1:08–1:35 — Baseline-aware, uncertainty-preserving reasoning
+- all eight deterministic checks passed;
+- the 39/40-hour workload tradeoff is visible;
+- no assignment changed and no caregiver was contacted.
 
-Point to **What changed for Rose?**, the care brief counts, and **Still
-unresolved**.
+Approve Jordan in the human-only UI. The coverage tools disappear; briefing
+tools replace them.
 
-“Grapevine does not compare Rose with a generic definition of normal. It
-compares observations with her authorized baseline and keeps unknowns visible.”
+## 1:05–1:38 — “Since you were last here”
 
-## 1:35–2:02 — Agent prepares; caregiver decides
+Open **My shift**. Show:
 
-Let ChatGPT call `get_care_evidence`, then `prepare_care_team_review`. The server
-requires a current snapshot and verifies that two gaps match the signed plan.
+- Rose as a person, not an alert;
+- Care Plan v4 and changes since Jordan's last visit;
+- what matters today;
+- the unresolved nurse review;
+- explicit “do not infer” boundaries.
 
-When the drawer opens, show:
+“The agent assembles context across systems. It does not invent care instructions
+or decide that a clinical event occurred.”
 
-- nothing has been sent or transmitted;
-- no diagnosis or emergency determination was made;
-- no medication or care plan changed.
+Jordan acknowledges the brief and starts the simulated visit. Explain that the
+check-in is simulated EVV evidence; a missing check-in would not prove absence.
 
-Approve or dismiss the simulated review.
+## 1:38–2:05 — The shift produces bounded evidence
 
-## 2:02–2:25 — Capabilities follow the care workflow
+Complete the compressed visit. Show the recorded facts:
 
-Open **Devices & MCP**. Show that preparation tools disappear while a human
-decision is pending and that the 11-tool catalog exposes only the current safe
-subset.
+- evening routine completed;
+- meal delivery acknowledged;
+- Rose asked for a later dinner;
+- no cause or clinical meaning inferred.
 
-“Safety is enforced by server state, snapshot freshness, idempotency, and human
-surfaces—not only by prompt wording.”
+`prepare_shift_handoff` now becomes available. It was not present before the
+visit was complete.
 
-## 2:25–2:45 — The original evidence-resolution loop
+## 2:05–2:31 — Context reaches the next caregiver
 
-Briefly reset to **Missed window** and explain the optional second path:
+Prepare the handoff to Luis. Show that the outgoing caregiver must approve and
+Luis has no access to the draft. Approve as Jordan, open **Handoffs**, and
+acknowledge as Luis.
 
-device → agent → Rose → changed evidence → agent → caregiver.
+The loop now reads entirely complete:
 
-Only Rose can answer her card; the agent must re-observe after her response.
+`disruption → constraints → approval → brief → visit → handoff`
 
-## 2:45–2:59 — Close
+## 2:31–2:50 — WebMCP and device boundaries
 
-“Grapevine Care helps people understand and coordinate a person's life over
-time. Devices observe, agents organize context, and responsible humans remain
-the source of truth and authority.”
+Open **Devices & MCP**. Show the state-dependent tool list and
+`grapevine.care.device.v1` adapter.
+
+“The same architecture can accept evidence from future equipment, but a device
+adapter cannot add executable tools, release medication, or transfer clinical
+authority to the agent.”
+
+## 2:50–2:59 — Close
+
+“Care doesn't happen in one shift. Grapevine makes sure context doesn't end when
+the shift does.”
 
 ## Recording checklist
 
 - Keep the final video under three minutes.
-- Show a real WebMCP call within the first 12 seconds.
+- Show a real WebMCP call within the first 30 seconds.
 - Record at 1080p with readable browser zoom and clear audio.
-- Show the deployed URL and real tool calls.
-- Use no third-party music, logos, protected health information, or private data.
+- Show the deployed URL, real tool calls, and both human approval gates.
+- Use no protected health information, private data, third-party music, or
+  unauthorized logos.
 - Upload publicly to YouTube and add the link to Devpost.

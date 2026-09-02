@@ -2,9 +2,11 @@
 
 ## Intended use
 
-Demonstrate how WebMCP can help an agent summarize fictional elder-care evidence
-over time, compare it with a care-team-authored baseline, and prepare caregiver
-or care-team review while preserving human control.
+Demonstrate how WebMCP can help an agent coordinate fictional caregiver work:
+recover an uncovered shift, brief an approved replacement, preserve bounded
+visit evidence, and hand unresolved context to the next caregiver while keeping
+workforce, clinical, resident, and device authority with people and deterministic
+systems.
 
 ## Explicit non-use
 
@@ -33,6 +35,14 @@ caregivers.
 | Longitudinal summary hides contradictory evidence | Care brief carries counts, source-visible events, and a dedicated unresolved-questions list |
 | Nurse review bypasses monitoring criteria | Server requires the seeded signed-plan threshold and a current evidence snapshot |
 | Prepared handoff is mistaken for transmission | Visible drawer and tool output state `external_side_effect: false`; no care-provider integration exists |
+| Agent assigns an unsuitable caregiver | The server applies eight explicit availability, readiness, conflict, travel, and workload constraints; no opaque model score |
+| Sensitive traits influence coverage | Candidate evaluation contains only job-relevant operational constraints and never asks the model to rank by demographic or health data |
+| Scheduler authority is bypassed | `prepare_shift_coverage` creates a draft only; assignment changes through a separate human-only approval endpoint |
+| Schedule changes after agent observation | Coverage and handoff preparation require a current shift-version snapshot; stale snapshots fail closed |
+| Replacement starts without resident context | `get_shift_brief` requires an approved assignment; the human start control records explicit brief acknowledgement |
+| Missing check-in is treated as proof of absence | Simulated EVV state is labeled as evidence status only; the product makes no absence or welfare conclusion |
+| Handoff reaches the wrong person | Recipient must match the next scheduled caregiver; access remains locked until the outgoing caregiver approves |
+| Nurse review and operational handoff conflict | Separate tables, schemas, tools, gates, and UI surfaces eliminate the earlier overlapping “shift handoff” review type |
 | One judge changes another judge's demo | Every mutable row is scoped to an isolated browser run |
 | Reset leaves stale inventory or evidence | Full run reconstruction in one D1 batch |
 | Repeated approval creates duplicate history | Conditional resolution; already-resolved actions return without another event |
@@ -51,6 +61,11 @@ caregivers.
 - Resident response pending: preparation capabilities are removed.
 - Caregiver or care-team review pending: all preparation capabilities are removed.
 - Monitoring threshold absent: care-team review preparation is rejected.
+- Ineligible caregiver: coverage preparation is rejected with named deterministic exclusions.
+- Changed shift version: the schedule snapshot is rejected and the agent must re-read context.
+- Coverage draft pending: coverage preparation tools are removed until the scheduler decides.
+- Visit not completed: operational handoff preparation is rejected.
+- Outgoing approval absent: the next caregiver cannot access or acknowledge the handoff.
 - Repeated dose confirmation or action resolution: no second mutation or event.
 - Scenario reset: all mutable run state returns to the documented seed.
 

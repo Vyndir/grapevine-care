@@ -6,26 +6,28 @@ Grapevine Care
 
 ## Tagline
 
-Devices observe. Agents structure evidence. People stay in control.
+Context that follows the care.
 
 ## Inspiration
 
-Rose's caregiver needs to know more than whether one alert fired: how Rose has
-been doing relative to her own routine, what her care team asked the family to
-watch, and what remains unknown. Grapevine Care turns three days of fictional
-resident, device, caregiver, and care-team evidence into a source-visible care
-story without letting the agent invent clinical meaning.
+Care does not happen in one shift. When a caregiver calls out, the replacement
+needs more than an address and a time: they need to know the person, what
+changed, what matters today, what the previous caregiver saw, and what remains
+unresolved. Grapevine Care keeps that context moving across the whole caregiver
+continuity loop without transferring workforce or clinical authority to AI.
 
 ## What it does
 
-The fictional, per-browser demo connects an elder-friendly medication station,
-caregiver care cockpit, signed monitoring plan, care circle, and extensible
-device registry. A compressed 72-hour episode establishes Rose's routine,
-introduces an ambiguous medication gap, records Rose's bounded self-report,
-shows routine activity resuming, and then introduces a second care-plan-relevant
-change. WebMCP lets an agent read Rose's authorized context, summarize the
-longitudinal story, preserve unresolved questions, and prepare—but never
-transmit—a nurse review or shift handoff. A caregiver approves or dismisses it.
+The default fictional demo begins when Maya calls out for Rose's 5:00 PM visit.
+WebMCP lets an agent inspect the versioned shift, evaluate four caregivers
+against eight explicit constraints, explain exclusions and workload tradeoffs,
+and prepare the one eligible option. A scheduler—not the agent—assigns Jordan.
+Jordan receives a “Since you were last here” brief, acknowledges it, completes a
+compressed visit, and records bounded facts. The agent prepares an
+assignment-bound handoff; Jordan approves before Luis receives and acknowledges
+it. The existing resident station, 72-hour care story, signed monitoring plan,
+nurse review, and extensible device registry remain available as supporting
+surfaces.
 
 ## How we built it
 
@@ -38,26 +40,34 @@ hosts the project.
 
 ## How WebMCP improves the UX
 
-Without WebMCP, an agent would scrape cards, infer status colors, and click
-controls meant for people. Grapevine Care exposes the exact evidence model and
-workflow boundary: actor identity, evidence class, observation time, trust
-boundary, plan version, personal baseline, signed monitoring rule, uncertainty,
-and state-dependent capabilities. The
-server rejects stale evidence and the page removes preparation tools during
-human decisions. The agent can coordinate without pretending it dispensed
-medication, answered for Rose, or contacted a caregiver.
-It can recognize “different for Rose” without claiming “clinically abnormal.”
+Without WebMCP, an agent would scrape cards, infer status colors, and miss the
+relationship between schedule, availability, readiness, resident context,
+recent history, visit evidence, and the next shift. Grapevine exposes those
+systems as one bounded conversation. Its capability set changes with the job:
+coverage tools disappear after scheduler approval, briefing tools appear only
+for an assignment, and handoff preparation appears only after visit completion.
+The server rejects stale schedule/evidence snapshots and ineligible candidates.
+Human-only controls own assignment, visit acknowledgement, handoff release, and
+recipient acknowledgement.
 
 ## Challenges
 
-The hardest problem was not adding automation; it was deciding where automation
-must stop. We separated local device enforcement, agent-readable evidence, and
-human approval, then made those boundaries visible in both the tool contract and
-the interface.
+The hardest problem was modeling continuity without turning the agent into a
+black-box dispatcher. We separated deterministic eligibility, agent explanation
+and preparation, scheduler authority, assigned-caregiver actions, nurse review,
+and next-caregiver acknowledgement, then encoded those boundaries in both the
+server state machine and the visible interface.
 
 ## Accomplishments
 
 - A deterministic, resettable judge flow.
+- A complete coverage-recovery and caregiver-continuity loop.
+- Eight named eligibility constraints with no sensitive ranking or opaque score.
+- Schedule-version snapshots and stale-state rejection.
+- Assignment-bound “Since you were last here” brief.
+- Simulated EVV evidence that does not treat missing check-in as proof of absence.
+- Operational handoffs separated from the nurse-review workflow.
+- Outgoing-caregiver approval before recipient access and acknowledgement.
 - Isolated browser runs that prevent cross-judge state contamination.
 - Server-enforced single confirmation, idempotent staging, and single review.
 - A resident evidence-resolution loop where only Rose can respond.
@@ -68,9 +78,9 @@ the interface.
 - Rose profile, personal baseline, care preferences, and care-team-authored
   monitoring rules with explicit source provenance.
 - A deterministic 72-hour care story and agent-readable longitudinal care brief.
-- A server-enforced signed-plan threshold for nurse review or shift handoff.
-- Care-team handoffs that are snapshot-bound, idempotent, approval-gated, and
-  never transmitted by the simulation.
+- A server-enforced signed-plan threshold for nurse review.
+- Nurse reviews and shift handoffs that are separate, snapshot-bound,
+  idempotent, approval-gated, and never transmitted by the simulation.
 - Explicit uncertainty for missed windows and stale devices.
 - Elder, caregiver, and device/MCP surfaces in one shared application.
 - A capability adapter that can support future equipment without granting

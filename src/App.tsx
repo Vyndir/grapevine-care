@@ -19,11 +19,13 @@ import { useEffect, useMemo, useState } from "react";
 import type { CareActions } from "./useCare";
 import { useCare } from "./useCare";
 import { useWebMCPTools, type WebMCPToolsState } from "./useWebMCPTools";
+import { CoverageCaregiverView } from "./CoverageCaregiverView";
 import type { CareState, CareTeamHandoff, Dose, PreparedAction, ResidentResponseCode, Scenario } from "./schemas";
 
 type Workspace = "resident" | "caregiver" | "system";
 
 const scenarios: Array<{ id: Scenario; label: string }> = [
+  { id: "coverage_callout", label: "Caregiver call-out" },
   { id: "on_schedule", label: "On schedule" },
   { id: "missed_window", label: "Missed window" },
   { id: "care_story", label: "72-hour story" },
@@ -55,7 +57,7 @@ function webMcpLabel(webmcp: WebMCPToolsState) {
 }
 
 function Brand() {
-  return <a className="brand" href="/" aria-label="Grapevine Care home"><span className="brand-mark"><LeafIcon weight="fill" /></span><span><strong>Grapevine Care</strong><small>Care context, with people in control</small></span></a>;
+  return <a className="brand" href="/" aria-label="Grapevine Care home"><span className="brand-mark"><LeafIcon weight="fill" /></span><span><strong>Grapevine Care</strong><small>Context that follows the care</small></span></a>;
 }
 
 function ResidentView({ state, actions, busy, onMessage }: { state: CareState; actions: CareActions; busy: boolean; onMessage(message: string): void; }) {
@@ -115,6 +117,7 @@ function CarePlanPanel({ state }: { state: CareState }) {
 }
 
 function CaregiverView({ state, actions, busy, onMessage }: { state: CareState; actions: CareActions; busy: boolean; onMessage(message: string): void; }) {
+  if (state.resident.scenario === "coverage_callout") return <CoverageCaregiverView state={state} actions={actions} busy={busy} onMessage={onMessage} story={<StoryPanel state={state} />} plan={<CarePlanPanel state={state} />} />;
   const openAction = state.actions.find((action) => action.status === "awaiting_human_approval");
   const openHandoff = state.handoffs.find((handoff) => handoff.status === "awaiting_human_approval");
   const residentCheckIn = state.resident_check_ins[0];
@@ -130,7 +133,7 @@ function CaregiverView({ state, actions, busy, onMessage }: { state: CareState; 
     try {
       const snapshot = await actions.getEvidenceSnapshot({ resident_id: state.resident.id, event_limit: 8 });
       await actions.prepareCareTeamReview({ resident_id: state.resident.id, review_type: reviewType, period_hours: 72, reason: "Two monitoring-plan signals occurred within 72 hours: repeated medication-confirmation gaps and a later-than-baseline morning activity signal. Causes remain unresolved; qualified human review is requested.", evidence_snapshot_id: snapshot.evidence_snapshot_id, idempotency_key: `manual-${reviewType}-${state.evidence_version}` });
-      onMessage("A structured care-team handoff was prepared from current evidence. Nothing was sent; caregiver approval is required.");
+      onMessage("A structured nurse review was prepared from current evidence. Nothing was sent; caregiver approval is required.");
     } catch (caught) { onMessage(caught instanceof Error ? caught.message : "Could not prepare that handoff."); }
   }
   return <main className="caregiver-layout">
@@ -138,10 +141,10 @@ function CaregiverView({ state, actions, busy, onMessage }: { state: CareState; 
       <nav className="cockpit-tabs" aria-label="Caregiver views">{(["now", "story", "plan", "circle"] as CaregiverTab[]).map((item) => <button key={item} className={tab === item ? "active" : ""} type="button" onClick={() => setTab(item)}>{item === "plan" ? "Care plan" : item === "circle" ? "Care circle" : item[0].toUpperCase() + item.slice(1)}</button>)}</nav>
       {tab === "story" && <StoryPanel state={state} />}
       {tab === "plan" && <CarePlanPanel state={state} />}
-      {tab === "circle" && <div className="circle-workspace"><CareCircle /><section className="handoff-explainer"><p className="eyebrow">Continuity between people</p><h2>Context travels; authority does not</h2><p>A prepared nurse review or shift handoff contains the signed plan, relevant evidence, Rose’s self-report, baseline comparisons, and unresolved questions. A caregiver must approve it, and this simulation never transmits it.</p></section></div>}
+      {tab === "circle" && <div className="circle-workspace"><CareCircle /><section className="handoff-explainer"><p className="eyebrow">Continuity between people</p><h2>Context travels; authority does not</h2><p>A prepared nurse review contains the signed plan, relevant evidence, Rose’s self-report, baseline comparisons, and unresolved questions. Operational shift handoffs remain assignment-bound.</p></section></div>}
       {tab === "now" && <><section className={`attention-panel ${state.resident.severity}`}><div className="attention-icon">{state.resident.severity === "routine" ? <CheckCircleIcon weight="fill" /> : <WarningCircleIcon weight="fill" />}</div><div><p className="eyebrow">Current signal</p><h2>{state.events[0]?.summary}</h2><p>{state.events[0]?.detail}</p><dl><div><dt>Observed</dt><dd>{timeLabel(state.events[0]?.occurred_at, state.resident.timezone)}</dd></div><div><dt>Source</dt><dd>{state.events[0]?.source}</dd></div><div><dt>Why we’re showing this</dt><dd>{state.resident.scenario === "care_story" ? "Rose’s care plan asks the care circle to review two confirmation gaps within 72 hours." : state.resident.scenario === "missed_window" ? "The plan asks the care circle to resolve a medication-confirmation gap without assuming ingestion." : state.resident.scenario === "device_offline" ? "Telemetry is stale; the local controller remains authoritative." : "A deterministic device rule produced this state."}</dd></div></dl></div></section><div className="care-metrics"><article><small>Confirmed in story</small><strong>{state.care_story.routine_confirmations}</strong><span>Routine windows</span></article><article><small>Supply forecast</small><strong>{days} days</strong><span>{days <= 10 ? "Review refill timing" : "Above reminder threshold"}</span></article><article><small>Device health</small><strong>{state.devices.filter((device) => device.status === "online").length}/{state.devices.length}</strong><span>Reporting normally</span></article><article><small>Human reviews</small><strong>{openAction || openHandoff ? "1" : "0"}</strong><span>Awaiting your decision</span></article></div><section className="evidence-panel"><div className="section-heading"><div><p className="eyebrow">Evidence chain of custody</p><h2>What the system actually knows</h2></div><span>Actor · class · trust boundary</span></div><ol>{state.events.slice(0, 7).map((event) => <li key={event.id}><span className={`event-dot ${event.severity}`} /><div><strong>{event.summary}</strong><p>{event.detail}</p><small>{timeLabel(event.observed_at, state.resident.timezone)} · {event.actor_type.replaceAll("_", " ")} · {event.evidence_type.replaceAll("_", " ")} · {event.source}</small></div></li>)}</ol></section></>}
     </section>
-    <aside className="caregiver-rail"><section className="action-panel"><p className="eyebrow">Human-controlled next step</p>{state.resident.scenario === "care_story" ? <><h2>{openHandoff ? "One care-team handoff awaits review" : "Prepare contextual review"}</h2><p>{openHandoff ? "Nothing has been transmitted. Review the visible evidence package." : "The signed plan’s repeated-gap threshold is present. Stage a nurse review or shift handoff without making a clinical conclusion."}</p><div className="action-buttons"><button type="button" disabled={busy || Boolean(openAction || openHandoff)} onClick={() => void stageHandoff("nurse_review")}>Prepare nurse review</button><button type="button" disabled={busy || Boolean(openAction || openHandoff)} onClick={() => void stageHandoff("shift_handoff")}>Prepare shift handoff</button></div></> : <><h2>{openAction ? "One check-in is ready to review" : canPrepare ? "Prepare a check-in" : "Waiting for Rose"}</h2><p>{openAction ? "Nothing has been sent. Open the review panel below to approve or dismiss it." : canPrepare ? "Choose a channel to stage from current evidence. A person must still review it." : "A bounded question is available on Rose's station. The agent cannot answer on her behalf or skip this evidence step."}</p><div className="action-buttons"><button type="button" disabled={busy || Boolean(openAction || openHandoff) || !canPrepare} onClick={() => void stage("call")}>Prepare call</button><button type="button" disabled={busy || Boolean(openAction || openHandoff) || !canPrepare} onClick={() => void stage("visit")}>Prepare visit</button></div></>}</section><section className="schedule-panel"><p className="eyebrow">Signed monitoring plan</p><h2>What requires review</h2><ul>{state.monitoring_plan.map((rule) => <li key={rule.id}><span><strong>{rule.title}</strong><small>{rule.threshold_description}</small></span></li>)}</ul></section><CareCircle /></aside>
+    <aside className="caregiver-rail"><section className="action-panel"><p className="eyebrow">Human-controlled next step</p>{state.resident.scenario === "care_story" ? <><h2>{openHandoff ? "One nurse review awaits approval" : "Prepare contextual review"}</h2><p>{openHandoff ? "Nothing has been transmitted. Review the visible evidence package." : "The signed plan’s repeated-gap threshold is present. Stage a nurse review without making a clinical conclusion."}</p><div className="action-buttons single"><button type="button" disabled={busy || Boolean(openAction || openHandoff)} onClick={() => void stageHandoff("nurse_review")}>Prepare nurse review</button></div></> : <><h2>{openAction ? "One check-in is ready to review" : canPrepare ? "Prepare a check-in" : "Waiting for Rose"}</h2><p>{openAction ? "Nothing has been sent. Open the review panel below to approve or dismiss it." : canPrepare ? "Choose a channel to stage from current evidence. A person must still review it." : "A bounded question is available on Rose's station. The agent cannot answer on her behalf or skip this evidence step."}</p><div className="action-buttons"><button type="button" disabled={busy || Boolean(openAction || openHandoff) || !canPrepare} onClick={() => void stage("call")}>Prepare call</button><button type="button" disabled={busy || Boolean(openAction || openHandoff) || !canPrepare} onClick={() => void stage("visit")}>Prepare visit</button></div></>}</section><section className="schedule-panel"><p className="eyebrow">Signed monitoring plan</p><h2>What requires review</h2><ul>{state.monitoring_plan.map((rule) => <li key={rule.id}><span><strong>{rule.title}</strong><small>{rule.threshold_description}</small></span></li>)}</ul></section><CareCircle /></aside>
   </main>;
 }
 
@@ -156,7 +159,13 @@ const toolDetails: Record<string, [string, string]> = {
   prepare_resident_check_in: ["Places a bounded question only Rose can answer", "resident gated"],
   prepare_caregiver_check_in: ["Requires current evidence and visible human approval", "approval gated"],
   request_device_health_snapshot: ["Fresh non-clinical diagnostic without device control", "diagnostic"],
-  prepare_care_team_review: ["Snapshot-bound nurse review or shift handoff", "approval gated"]
+  prepare_care_team_review: ["Snapshot-bound nurse review", "approval gated"],
+  get_shift_context: ["Version-bound assignment, disruption, visit, and handoff state", "read only"],
+  get_coverage_candidates: ["Eight explicit eligibility constraints with no opaque score", "read only"],
+  prepare_shift_coverage: ["Eligible recommendation staged for scheduler approval", "approval gated"],
+  get_changes_since_last_shift: ["Assignment-relevant changes since the caregiver last visited", "read only"],
+  get_shift_brief: ["Person, plan, changes, unresolved items, and boundaries", "read only"],
+  prepare_shift_handoff: ["Completed visit evidence staged for outgoing-caregiver approval", "approval gated"]
 };
 
 function SystemView({ state, webmcp }: { state: CareState; webmcp: WebMCPToolsState; }) {

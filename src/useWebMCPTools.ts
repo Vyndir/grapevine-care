@@ -7,6 +7,12 @@ import {
   getDeviceCapabilitiesArgsSchema,
   getInventoryForecastArgsSchema,
   getMedicationScheduleArgsSchema,
+  getShiftContextArgsSchema,
+  getCoverageCandidatesArgsSchema,
+  prepareShiftCoverageArgsSchema,
+  getChangesSinceLastShiftArgsSchema,
+  getShiftBriefArgsSchema,
+  prepareShiftHandoffArgsSchema,
   parseArgs,
   prepareCaregiverCheckInArgsSchema,
   prepareCareTeamReviewArgsSchema,
@@ -39,6 +45,16 @@ function useWebMCPTool(tool: WebMCPTool | null): Registration {
 
 export function expectedToolNames(state: CareState | null, workspace: WebMCPWorkspace) {
   if (!state) return [];
+  if (state.resident.scenario === "coverage_callout") {
+    if (workspace === "resident") return ["get_care_overview", "get_medication_schedule", "get_resident_context"];
+    const shift = state.shifts.find((item) => item.id === "shift-wed-pm") ?? state.shifts[0];
+    if (!shift) return [];
+    const names = ["get_shift_context"];
+    if (shift.coverage_status === "coverage_needed") names.push("get_coverage_candidates", "prepare_shift_coverage");
+    if (shift.assigned_caregiver_id && shift.visit_status !== "completed") names.push("get_changes_since_last_shift", "get_shift_brief");
+    if (shift.visit_status === "completed" && shift.handoff_status === "ready") names.push("prepare_shift_handoff");
+    return names;
+  }
   const names = ["get_care_overview", "get_medication_schedule", "get_care_evidence"];
   const residentCheckIn = state.resident_check_ins[0];
   const pendingAction = state.actions.some((action) => action.status === "awaiting_human_approval");
@@ -157,9 +173,45 @@ export function useWebMCPTools(actions: CareActions, state: CareState | null, wo
     } satisfies WebMCPTool,
     careTeamReview: {
       name: "prepare_care_team_review", title: "Prepare care-team review",
-      description: "Stage a snapshot-bound 24/72-hour nurse review or caregiver shift handoff when Rose’s signed monitoring criteria are met. Nothing is transmitted until a caregiver approves the visible draft. Cannot diagnose or change the care plan.",
+      description: "Stage a snapshot-bound 24/72-hour nurse review when Rose’s signed monitoring criteria are met. Operational shift handoffs use the assignment-bound prepare_shift_handoff tool. Nothing is transmitted until a caregiver approves the visible draft.",
       inputSchema: toolInputSchemas.prepareCareTeamReview, annotations: baseAnnotations,
       async execute(args: unknown) { return actions.prepareCareTeamReview(parseArgs(prepareCareTeamReviewArgsSchema, args)); }
+    } satisfies WebMCPTool,
+    shiftContext: {
+      name: "get_shift_context", title: "Get shift context",
+      description: "Read one caregiver shift, its assignment, disruption, visit and handoff state, and create a version-bound schedule snapshot for safe follow-on preparation.",
+      inputSchema: toolInputSchemas.getShiftContext, annotations: { ...baseAnnotations, readOnlyHint: true },
+      async execute(args: unknown) { return actions.getShiftContext(parseArgs(getShiftContextArgsSchema, args)); }
+    } satisfies WebMCPTool,
+    coverageCandidates: {
+      name: "get_coverage_candidates", title: "Get coverage candidates",
+      description: "Evaluate caregivers against explicit availability, qualification, training, Rose orientation, care-plan acknowledgement, conflicts, travel time, and weekly-hour constraints. Returns no opaque score and never changes the schedule.",
+      inputSchema: toolInputSchemas.getCoverageCandidates, annotations: { ...baseAnnotations, readOnlyHint: true },
+      async execute(args: unknown) { return actions.getCoverageCandidates(parseArgs(getCoverageCandidatesArgsSchema, args)); }
+    } satisfies WebMCPTool,
+    prepareCoverage: {
+      name: "prepare_shift_coverage", title: "Prepare shift coverage",
+      description: "Stage one eligible caregiver as the constraint-explained coverage recommendation against a current schedule snapshot. A scheduler must approve before the assignment changes.",
+      inputSchema: toolInputSchemas.prepareShiftCoverage, annotations: baseAnnotations,
+      async execute(args: unknown) { return actions.prepareShiftCoverage(parseArgs(prepareShiftCoverageArgsSchema, args)); }
+    } satisfies WebMCPTool,
+    changesSinceLastShift: {
+      name: "get_changes_since_last_shift", title: "Get changes since last shift",
+      description: "Catch the assigned caregiver up on meaningful, source-bounded changes since they last cared for Rose, while naming what has not changed and avoiding clinical inference.",
+      inputSchema: toolInputSchemas.getChangesSinceLastShift, annotations: { ...baseAnnotations, readOnlyHint: true },
+      async execute(args: unknown) { return actions.getChangesSinceLastShift(parseArgs(getChangesSinceLastShiftArgsSchema, args)); }
+    } satisfies WebMCPTool,
+    shiftBrief: {
+      name: "get_shift_brief", title: "Get shift brief",
+      description: "Brief the currently assigned caregiver on Rose, what matters today, what changed, unresolved items, care-plan provenance, and whom to contact. It cannot assign, diagnose, or change care instructions.",
+      inputSchema: toolInputSchemas.getShiftBrief, annotations: { ...baseAnnotations, readOnlyHint: true },
+      async execute(args: unknown) { return actions.getShiftBrief(parseArgs(getShiftBriefArgsSchema, args)); }
+    } satisfies WebMCPTool,
+    shiftHandoff: {
+      name: "prepare_shift_handoff", title: "Prepare shift handoff",
+      description: "Stage an assignment-bound handoff from completed visit evidence for the next caregiver. The outgoing caregiver must approve it before the recipient can see and acknowledge it.",
+      inputSchema: toolInputSchemas.prepareShiftHandoff, annotations: baseAnnotations,
+      async execute(args: unknown) { return actions.prepareShiftHandoff(parseArgs(prepareShiftHandoffArgsSchema, args)); }
     } satisfies WebMCPTool
   }), [actions]);
 
@@ -176,9 +228,15 @@ export function useWebMCPTools(actions: CareActions, state: CareState | null, wo
     useWebMCPTool(enabled.has(tools.residentCheckIn.name) ? tools.residentCheckIn : null),
     useWebMCPTool(enabled.has(tools.prepare.name) ? tools.prepare : null),
     useWebMCPTool(enabled.has(tools.deviceHealth.name) ? tools.deviceHealth : null),
-    useWebMCPTool(enabled.has(tools.careTeamReview.name) ? tools.careTeamReview : null)
+    useWebMCPTool(enabled.has(tools.careTeamReview.name) ? tools.careTeamReview : null),
+    useWebMCPTool(enabled.has(tools.shiftContext.name) ? tools.shiftContext : null),
+    useWebMCPTool(enabled.has(tools.coverageCandidates.name) ? tools.coverageCandidates : null),
+    useWebMCPTool(enabled.has(tools.prepareCoverage.name) ? tools.prepareCoverage : null),
+    useWebMCPTool(enabled.has(tools.changesSinceLastShift.name) ? tools.changesSinceLastShift : null),
+    useWebMCPTool(enabled.has(tools.shiftBrief.name) ? tools.shiftBrief : null),
+    useWebMCPTool(enabled.has(tools.shiftHandoff.name) ? tools.shiftHandoff : null)
   ];
-  const orderedTools = [tools.overview, tools.schedule, tools.inventory, tools.devices, tools.evidence, tools.context, tools.story, tools.residentCheckIn, tools.prepare, tools.deviceHealth, tools.careTeamReview];
+  const orderedTools = [tools.overview, tools.schedule, tools.inventory, tools.devices, tools.evidence, tools.context, tools.story, tools.residentCheckIn, tools.prepare, tools.deviceHealth, tools.careTeamReview, tools.shiftContext, tools.coverageCandidates, tools.prepareCoverage, tools.changesSinceLastShift, tools.shiftBrief, tools.shiftHandoff];
   const activeRegistrations = registrations.filter((_, index) => enabled.has(orderedTools[index].name));
   return { supported: registrations.some((item) => item.supported), registered: activeRegistrations.length > 0 && activeRegistrations.every((item) => item.registered), error: activeRegistrations.find((item) => item.error)?.error ?? null, count: activeRegistrations.filter((item) => item.registered).length, availableNames };
 }

@@ -11,7 +11,16 @@ export const careTables = [
   "care_demo_device_checks",
   "care_demo_profiles",
   "care_demo_monitoring_rules",
-  "care_demo_handoffs"
+  "care_demo_handoffs",
+  "care_demo_caregivers",
+  "care_demo_caregiver_availability",
+  "care_demo_caregiver_readiness",
+  "care_demo_shifts",
+  "care_demo_schedule_snapshots",
+  "care_demo_coverage_proposals",
+  "care_demo_visit_events",
+  "care_demo_shift_handoffs",
+  "care_demo_handoff_acknowledgements"
 ] as const;
 
 export type CareTable = (typeof careTables)[number];

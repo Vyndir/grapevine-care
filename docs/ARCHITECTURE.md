@@ -7,11 +7,13 @@ Fictional device adapters
   └─ emit scoped signals + provenance
        └─ D1 evidence model
             ├─ Resident UI: local confirmation + bounded self-report
-            ├─ Caregiver UI: Now + Story + Care Plan + Care Circle
+            ├─ Caregiver UI: Today + Schedule + My Shift + Handoffs + Story + Care Plan
             └─ WebMCP: state-dependent evidence and preparation tools
 
 Medication release: deterministic device controller only
 Caregiver outreach: human approval only
+Shift assignment: deterministic server constraints + scheduler approval only
+Shift handoff release: outgoing caregiver approval only
 Medical and emergency decisions: outside the product
 ```
 
@@ -24,8 +26,9 @@ authority model:
   routine, support arrangement, and preferences.
 - `care_demo_monitoring_rules` stores the signed instructions that determine
   what the care circle should review. The agent cannot author these rules.
-- `care_demo_handoffs` stores snapshot-bound nurse-review or shift-handoff
-  drafts and their explicit caregiver decision.
+- `care_demo_handoffs` stores snapshot-bound nurse-review drafts and their
+  explicit caregiver decision. Operational shift handoffs have a separate,
+  assignment-bound model.
 
 `get_resident_context` separates clinical/care-team facts from personal
 baseline and preferences. `get_care_story` returns a bounded 24/72-hour summary,
@@ -35,6 +38,54 @@ baseline is represented as a coordination signal—not as a diagnosis.
 When the seeded story contains two unconfirmed medication windows within 72
 hours, the server—not the model—matches the signed plan threshold before
 `prepare_care_team_review` can succeed.
+
+## Caregiver continuity layer
+
+Migration `0005_caregiver_continuity_loop.sql` adds a real shift and assignment
+model:
+
+- caregiver profiles, availability, and resident-specific readiness;
+- versioned shifts and schedule snapshots;
+- coverage proposals with scheduler decisions;
+- simulated EVV-style visit events;
+- assignment-bound handoffs and recipient acknowledgements.
+
+The primary state machine is:
+
+```text
+coverage_needed
+  → get_shift_context (schedule snapshot)
+  → get_coverage_candidates (eight deterministic constraints)
+  → prepare_shift_coverage
+  → awaiting_scheduler_approval
+  → scheduler approves
+  → assigned
+  → get_changes_since_last_shift + get_shift_brief
+  → assigned caregiver acknowledges and starts
+  → in_progress
+  → assigned caregiver completes
+  → handoff ready
+  → prepare_shift_handoff
+  → outgoing caregiver approves
+  → available to next caregiver
+  → next caregiver acknowledges
+```
+
+Only Jordan passes the seeded call-out scenario. Maya called out; Luis has a
+schedule/travel conflict; Elena lacks Rose orientation and Care Plan v4
+acknowledgement. The server returns the same eight named checks for every
+candidate. There is no model-authored suitability score and no use of sensitive
+personal traits.
+
+`schedule_snapshot_id` binds coverage and handoff preparation to a specific
+shift version. Assignment, visit, and handoff transitions increment the version,
+so a stale agent observation fails closed. Preparation is idempotent; conditional
+updates prevent two decisions from applying the same transition.
+
+Visit events are explicitly labeled as simulated EVV attestations, caregiver
+attestations, or bounded observations. Missing check-in evidence is never treated
+as proof of caregiver absence. The demo's shift start, completion, approval, and
+acknowledgement controls are human-only UI surfaces.
 
 The browser page is the WebMCP server. Agents discover tools in the same page a
 person is using, so the visible interface and tool results share one workflow
@@ -73,7 +124,7 @@ Read Rose's authorized context
   → summarize 72-hour evidence relative to her baseline
   → preserve unresolved causes
   → verify the signed monitoring threshold
-  → prepare nurse review or shift handoff from a current snapshot
+  → prepare nurse review from a current snapshot
   → caregiver approves or dismisses
 ```
 
@@ -99,7 +150,7 @@ medication.
 
 D1 stores an isolated fictional run for each browser session. Every medication
 window, device, inventory record, evidence snapshot, resident question, event,
-profile, monitoring rule, care-team handoff, diagnostic, and staged action is
+profile, monitoring rule, nurse-review draft, diagnostic, and staged action is
 keyed by the opaque `demo_run_id` sent in a same-origin header. Indexed query paths begin
 with that run ID; a composite unique constraint prevents duplicate idempotency
 keys within a run without coupling different judges.

@@ -1,0 +1,72 @@
+import { CheckCircleIcon, ShieldCheckIcon, WarningCircleIcon } from "@phosphor-icons/react";
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import type { CoverageCandidate, CareState } from "./schemas";
+import type { CareActions } from "./useCare";
+
+type Tab = "today" | "schedule" | "shift" | "handoffs" | "story" | "plan";
+
+function timeLabel(value: string, timeZone: string) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone }) : value;
+}
+
+export function CoverageCaregiverView({ state, actions, busy, onMessage, story, plan }: { state: CareState; actions: CareActions; busy: boolean; onMessage(message: string): void; story: ReactNode; plan: ReactNode; }) {
+  const shift = state.shifts.find((item) => item.id === "shift-wed-pm")!;
+  const proposal = state.coverage_proposals.find((item) => item.shift_id === shift.id && item.status === "awaiting_scheduler_approval");
+  const handoff = state.shift_handoffs.find((item) => item.shift_id === shift.id);
+  const assigned = state.caregivers.find((item) => item.id === shift.assigned_caregiver_id);
+  const [tab, setTab] = useState<Tab>("today");
+  const [candidates, setCandidates] = useState<CoverageCandidate[]>([]);
+  const [scheduleSnapshotId, setScheduleSnapshotId] = useState("");
+  useEffect(() => { setTab("today"); setCandidates([]); setScheduleSnapshotId(""); }, [state.demo_run_id, state.resident.scenario]);
+
+  async function evaluateCoverage() {
+    try {
+      const [context, result] = await Promise.all([actions.getShiftContext({ shift_id: shift.id }), actions.getCoverageCandidates({ shift_id: shift.id })]);
+      setScheduleSnapshotId(String(context.schedule_snapshot_id ?? ""));
+      setCandidates(result.candidates);
+      onMessage("Four caregivers were checked against eight explicit constraints. No schedule change was made.");
+    } catch (caught) { onMessage(caught instanceof Error ? caught.message : "Coverage could not be evaluated."); }
+  }
+
+  async function stageCoverage() {
+    try {
+      const context = scheduleSnapshotId ? { schedule_snapshot_id: scheduleSnapshotId } : await actions.getShiftContext({ shift_id: shift.id });
+      await actions.prepareShiftCoverage({ shift_id: shift.id, caregiver_id: "caregiver-jordan", schedule_snapshot_id: String(context.schedule_snapshot_id), reason: "Jordan is the only candidate who passes full-window availability, role qualification, training, Rose orientation, Care Plan v4 acknowledgement, conflict, travel, and stated weekly-hour constraints.", idempotency_key: `coverage-jordan-${shift.version}` });
+      onMessage("Jordan was prepared for scheduler review. The assignment has not changed.");
+    } catch (caught) { onMessage(caught instanceof Error ? caught.message : "Coverage could not be prepared."); }
+  }
+
+  async function stageShiftHandoff() {
+    try {
+      const context = await actions.getShiftContext({ shift_id: shift.id });
+      await actions.prepareShiftHandoff({ shift_id: shift.id, to_caregiver_id: "caregiver-luis", schedule_snapshot_id: String(context.schedule_snapshot_id), reason: "Carry the completed evening routine, Rose's bounded dinner-time preference, and the unresolved nurse review into Luis's next scheduled visit.", idempotency_key: `handoff-${shift.id}-${shift.version}` });
+      onMessage("The visit handoff is staged for Jordan's approval. Luis cannot see it yet.");
+    } catch (caught) { onMessage(caught instanceof Error ? caught.message : "The handoff could not be prepared."); }
+  }
+
+  const steps = [
+    ["Disruption", true], ["Constraints", candidates.length > 0 || shift.coverage_status !== "coverage_needed"], ["Approval", shift.coverage_status === "assigned"], ["Brief", Boolean(assigned)], ["Visit", shift.visit_status === "completed"], ["Handoff", shift.handoff_status === "acknowledged"]
+  ] as const;
+  const activeIndex = steps.findIndex(([, complete]) => !complete);
+
+  return <main className="continuity-layout">
+    <section className="continuity-hero"><div><p className="eyebrow">Caregiver continuity workspace · Wednesday, September 2</p><h1>Keep Rose’s care moving—without losing context.</h1><p>See what changed, recover an uncovered shift, brief the caregiver who steps in, and preserve what the next person needs.</p></div><span className="severity-badge attention"><i /> Live call-out</span></section>
+    <section className="continuity-loop" aria-label="Caregiver continuity loop">{steps.map(([label, done], index) => <div className={done ? "done" : index === activeIndex ? "current" : ""} key={label}><i>{done ? "✓" : index + 1}</i><span>{label}</span></div>)}</section>
+    <nav className="cockpit-tabs continuity-tabs" aria-label="Caregiver job views">{(["today", "schedule", "shift", "handoffs", "story", "plan"] as Tab[]).map((item) => <button key={item} className={tab === item ? "active" : ""} type="button" onClick={() => setTab(item)}>{item === "shift" ? "My shift" : item[0].toUpperCase() + item.slice(1)}</button>)}</nav>
+    {tab === "story" && story}
+    {tab === "plan" && plan}
+    {tab === "schedule" && <section className="continuity-card"><div className="section-heading"><div><p className="eyebrow">Today’s assignment chain</p><h2>Coverage and continuity at a glance</h2></div><span>Simulated schedule</span></div><div className="shift-list">{state.shifts.map((item) => { const caregiver = state.caregivers.find((person) => person.id === item.assigned_caregiver_id); return <article key={item.id} className={item.id === shift.id ? "focus" : ""}><time>{timeLabel(item.starts_at, state.resident.timezone)}–{timeLabel(item.ends_at, state.resident.timezone)}</time><div><strong>{caregiver?.display_name ?? "Coverage needed"}</strong><span>{item.required_role} · {item.visit_status.replaceAll("_", " ")}</span></div><b>{item.coverage_status.replaceAll("_", " ")}</b></article>; })}</div></section>}
+    {tab === "today" && <div className="continuity-grid"><section className="continuity-card callout-card"><header><span className="attention-icon"><WarningCircleIcon weight="fill" /></span><div><p className="eyebrow">2:15 PM · schedule disruption</p><h2>Maya called out for Rose’s 5:00–8:00 PM visit.</h2><p>The shift has no approved caregiver. Availability is only the first check; readiness, conflicts, travel, and workload still matter.</p></div></header><dl><div><dt>Resident</dt><dd>Rose · home visit</dd></div><div><dt>Required role</dt><dd>Home care aide</dd></div><div><dt>Must know</dt><dd>Rose orientation + Care Plan v4</dd></div><div><dt>Authority</dt><dd>Scheduler approves assignment</dd></div></dl></section><aside className="continuity-card next-step"><p className="eyebrow">Agent-assisted next step</p><h2>{proposal ? "Recommendation ready for you" : assigned ? `${assigned.display_name} is assigned` : "Recover coverage safely"}</h2><p>{proposal ? "Review the constraint evidence before changing the schedule." : assigned ? "Jordan can now review what changed since her last visit." : "The agent can compare candidates and prepare a recommendation. It cannot assign anyone."}</p>{!proposal && !assigned && <button type="button" disabled={busy} onClick={() => void evaluateCoverage()}>{candidates.length ? "Refresh constraints" : "Evaluate four caregivers"}</button>}{candidates.length > 0 && !proposal && !assigned && <button type="button" className="secondary" disabled={busy} onClick={() => void stageCoverage()}>Prepare Jordan for review</button>}</aside></div>}
+    {tab === "today" && candidates.length > 0 && !assigned && <section className="continuity-card candidate-panel"><div className="section-heading"><div><p className="eyebrow">Transparent constraint evaluation</p><h2>One eligible option—no black-box score</h2></div><span>8 deterministic checks</span></div><div className="candidate-grid">{candidates.map((candidate) => <article className={candidate.eligible ? "eligible" : "excluded"} key={candidate.caregiver.id}><header><div><strong>{candidate.caregiver.display_name}</strong><small>{candidate.continuity_note}</small></div><b>{candidate.eligible ? "Eligible" : "Not eligible"}</b></header><ul>{candidate.checks.map((check) => <li className={check.passed ? "pass" : "fail"} key={check.key}><span>{check.passed ? "✓" : "×"}</span><div><strong>{check.label}</strong><small>{check.detail}</small></div></li>)}</ul>{candidate.tradeoff && <p>{candidate.tradeoff}</p>}</article>)}</div></section>}
+    {tab === "shift" && <section className="continuity-card shift-brief"><div className="section-heading"><div><p className="eyebrow">Assignment-bound brief</p><h2>{assigned ? `Welcome back, ${assigned.display_name.split(" ")[0]}.` : "No caregiver is assigned yet."}</h2></div><span>{assigned ? `${assigned.previous_resident_visits} prior Rose visits` : "Awaiting coverage"}</span></div>{assigned ? <><div className="since-grid"><article><strong>Since you were last here</strong><ul><li>Care Plan v4 is active.</li><li>Two confirmation gaps met the human-review threshold.</li><li>Morning activity began later than Rose’s baseline.</li></ul></article><article><strong>What matters today</strong><ul><li>Support Rose’s documented evening routine.</li><li>Acknowledge meal delivery.</li><li>Record observations without inferring causes.</li></ul></article><article><strong>Do not infer</strong><ul><li>Missing confirmation is not proof of a missed dose.</li><li>Presence evidence is not proof of welfare.</li><li>The open nurse review remains unresolved.</li></ul></article></div>{shift.visit_status === "not_started" && <button type="button" disabled={busy} onClick={() => void actions.startShift(shift.id, assigned.id)}>I reviewed the brief · start shift</button>}{shift.visit_status === "in_progress" && <div className="visit-progress"><span><CheckCircleIcon weight="fill" /> Simulated EVV check-in recorded</span><button type="button" disabled={busy} onClick={() => void actions.completeShift(shift.id, assigned.id)}>Complete compressed visit</button></div>}{shift.visit_status === "completed" && <div className="visit-progress"><span><CheckCircleIcon weight="fill" /> Visit complete · bounded records preserved</span>{shift.handoff_status === "ready" && <button type="button" disabled={busy} onClick={() => void stageShiftHandoff()}>Prepare handoff to Luis</button>}</div>}</> : <p className="empty-copy">Return to Today to evaluate replacement coverage. The agent cannot brief an unassigned caregiver.</p>}</section>}
+    {tab === "handoffs" && <section className="continuity-card handoff-panel"><div className="section-heading"><div><p className="eyebrow">Context between shifts</p><h2>{handoff ? "Jordan → Luis" : "No operational handoff yet"}</h2></div><span>{shift.handoff_status.replaceAll("_", " ")}</span></div>{handoff ? <div className="handoff-columns"><article><strong>Completed</strong><ul>{handoff.completed.map((item) => <li key={item}>{item}</li>)}</ul></article><article><strong>Observed—not concluded</strong><ul>{handoff.observed.map((item) => <li key={item}>{item}</li>)}</ul></article><article><strong>Still unresolved</strong><ul>{handoff.unresolved.map((item) => <li key={item}>{item}</li>)}</ul></article></div> : <p className="empty-copy">A handoff is created only from a completed assigned visit. It does not duplicate the separate nurse-review workflow.</p>}{handoff?.status === "available_to_next_caregiver" && <button type="button" disabled={busy} onClick={() => void actions.acknowledgeShiftHandoff(handoff.id, "caregiver-luis")}>Acknowledge as Luis</button>}{handoff?.status === "acknowledged" && <p className="acknowledged"><CheckCircleIcon weight="fill" /> Luis acknowledged the handoff. The continuity loop is complete.</p>}</section>}
+    {proposal && <ApprovalDialog eyebrow="Scheduler approval required" title="Assign Jordan to Rose?" lock="Schedule locked" summary="Jordan Lee · 5:00–8:00 PM" detail={proposal.reason} facts={["All eight deterministic checks passed", "39 projected hours stays within Jordan’s stated 40-hour maximum", "No caregiver was contacted and no assignment changed yet"]} busy={busy} dismiss={() => actions.resolveShiftCoverage(proposal.id, "dismissed")} approve={() => actions.resolveShiftCoverage(proposal.id, "approved_in_demo")} approveLabel="Approve assignment" />}
+    {handoff?.status === "awaiting_caregiver_approval" && <ApprovalDialog eyebrow="Outgoing caregiver approval" title="Release handoff to Luis?" lock="Recipient locked" summary="Jordan → Luis" detail="Completed work, a bounded observation, and the unresolved nurse review become visible to Luis only after approval." facts={["The source visit is complete", "No diagnosis or treatment conclusion was added", "Luis cannot see the draft before Jordan approves it"]} busy={busy} dismiss={() => actions.resolveShiftHandoff(handoff.id, "dismissed")} approve={() => actions.resolveShiftHandoff(handoff.id, "approved_in_demo")} approveLabel="Approve handoff" />}
+  </main>;
+}
+
+function ApprovalDialog({ eyebrow, title, lock, summary, detail, facts, busy, dismiss, approve, approveLabel }: { eyebrow: string; title: string; lock: string; summary: string; detail: string; facts: string[]; busy: boolean; dismiss(): Promise<unknown>; approve(): Promise<unknown>; approveLabel: string; }) {
+  return <div className="review-scrim" role="presentation"><aside className="review-drawer" role="dialog" aria-modal="true" aria-labelledby="continuity-review-title"><header><div><p className="eyebrow">{eyebrow}</p><h2 id="continuity-review-title">{title}</h2></div><span><ShieldCheckIcon weight="fill" /> {lock}</span></header><div className="review-summary"><small>Constraint- and evidence-bound draft</small><strong>{summary}</strong><p>{detail}</p></div><div className="review-facts">{facts.map((fact) => <p key={fact}><CheckCircleIcon weight="fill" />{fact}</p>)}</div><div className="review-actions"><button className="secondary" type="button" disabled={busy} onClick={() => void dismiss()}>Dismiss</button><button type="button" disabled={busy} onClick={() => void approve()}>{approveLabel}</button></div></aside></div>;
+}

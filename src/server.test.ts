@@ -37,6 +37,7 @@ class TestD1 {
     this.sqlite.exec(readFileSync(new URL("../drizzle/0002_demo_run_isolation.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0003_evidence_resolution_loop.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0004_longitudinal_care_story.sql", import.meta.url), "utf8"));
+    this.sqlite.exec(readFileSync(new URL("../drizzle/0005_caregiver_continuity_loop.sql", import.meta.url), "utf8"));
   }
   close() { this.sqlite.close(); }
 }
@@ -203,7 +204,7 @@ describe("Grapevine Care server invariants", () => {
     expect(current.care_story.baseline_comparisons.find((item) => item.signal === "Morning activity")).toMatchObject({ evidence_status: "changed" });
   });
 
-  it("prepares and resolves one snapshot-bound care-team handoff without transmission", async () => {
+  it("prepares and resolves one snapshot-bound nurse review without transmission", async () => {
     await scenario(runA, "care_story");
     const currentSnapshot = await snapshot(runA);
     const body = JSON.stringify({ resident_id: "rose-demo", review_type: "nurse_review", period_hours: 72, reason: "Two care-plan monitoring signals occurred within 72 hours; qualified human review is requested without a clinical conclusion.", evidence_snapshot_id: currentSnapshot.evidence_snapshot_id, idempotency_key: "care-team-review-001" });
@@ -223,6 +224,46 @@ describe("Grapevine Care server invariants", () => {
     const currentSnapshot = await snapshot(runA);
     const response = await call(runA, "/api/care/handoffs", { method: "POST", body: JSON.stringify({ resident_id: "rose-demo", review_type: "nurse_review", period_hours: 72, reason: "Attempt review before the signed monitoring threshold is present.", evidence_snapshot_id: currentSnapshot.evidence_snapshot_id, idempotency_key: "premature-review-001" }) });
     expect(response.status).toBe(409);
+  });
+
+  it("recovers a caregiver call-out through scheduler approval, visit, and acknowledged handoff", async () => {
+    await scenario(runA, "coverage_callout");
+    const contextResponse = await call(runA, "/api/care/shift-context", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm" }) });
+    const context = await contextResponse.json() as { schedule_snapshot_id: string };
+    const candidateResponse = await call(runA, "/api/care/coverage-candidates", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm" }) });
+    const candidateResult = await candidateResponse.json() as { candidates: Array<{ caregiver: { id: string }; eligible: boolean; checks: unknown[] }> };
+    expect(candidateResult.candidates.filter((candidate) => candidate.eligible).map((candidate) => candidate.caregiver.id)).toEqual(["caregiver-jordan"]);
+    expect(candidateResult.candidates.every((candidate) => candidate.checks.length === 8)).toBe(true);
+    const prepared = await (await call(runA, "/api/care/coverage-proposals", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm", caregiver_id: "caregiver-jordan", schedule_snapshot_id: context.schedule_snapshot_id, reason: "Jordan passes every explicit eligibility constraint and stays within her stated weekly availability.", idempotency_key: "coverage-loop-001" }) })).json() as { proposal: { id: string }; schedule_changed: boolean };
+    expect(prepared.schedule_changed).toBe(false);
+    expect((await state(runA)).shifts.find((shift) => shift.id === "shift-wed-pm")?.assigned_caregiver_id).toBeNull();
+    await call(runA, `/api/care/coverage-proposals/${prepared.proposal.id}/resolve`, { method: "POST", body: JSON.stringify({ resolution: "approved_in_demo" }) });
+    expect((await state(runA)).shifts.find((shift) => shift.id === "shift-wed-pm")?.assigned_caregiver_id).toBe("caregiver-jordan");
+    const brief = await call(runA, "/api/care/shift-brief", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm", caregiver_id: "caregiver-jordan" }) });
+    expect(brief.status).toBe(200);
+    await call(runA, "/api/care/shifts/shift-wed-pm/start", { method: "POST", body: JSON.stringify({ caregiver_id: "caregiver-jordan" }) });
+    await call(runA, "/api/care/shifts/shift-wed-pm/complete", { method: "POST", body: JSON.stringify({ caregiver_id: "caregiver-jordan" }) });
+    const handoffContext = await (await call(runA, "/api/care/shift-context", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm" }) })).json() as { schedule_snapshot_id: string };
+    const preparedHandoff = await (await call(runA, "/api/care/shift-handoffs", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm", to_caregiver_id: "caregiver-luis", schedule_snapshot_id: handoffContext.schedule_snapshot_id, reason: "Preserve completed tasks, bounded observations, and unresolved items for the next assigned caregiver.", idempotency_key: "handoff-loop-001" }) })).json() as { handoff: { id: string }; recipient_has_access: boolean };
+    expect(preparedHandoff.recipient_has_access).toBe(false);
+    await call(runA, `/api/care/shift-handoffs/${preparedHandoff.handoff.id}/resolve`, { method: "POST", body: JSON.stringify({ resolution: "approved_in_demo" }) });
+    await call(runA, `/api/care/shift-handoffs/${preparedHandoff.handoff.id}/acknowledge`, { method: "POST", body: JSON.stringify({ caregiver_id: "caregiver-luis" }) });
+    const completed = await state(runA);
+    expect(completed.shifts.find((shift) => shift.id === "shift-wed-pm")).toMatchObject({ visit_status: "completed", handoff_status: "acknowledged" });
+    expect(completed.handoff_acknowledgements).toHaveLength(1);
+  });
+
+  it("rejects an ineligible caregiver and a stale schedule snapshot", async () => {
+    await scenario(runA, "coverage_callout");
+    const context = await (await call(runA, "/api/care/shift-context", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm" }) })).json() as { schedule_snapshot_id: string };
+    const ineligible = await call(runA, "/api/care/coverage-proposals", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm", caregiver_id: "caregiver-elena", schedule_snapshot_id: context.schedule_snapshot_id, reason: "Attempt to select a caregiver who has not completed Rose orientation or acknowledged Care Plan v4.", idempotency_key: "coverage-ineligible-001" }) });
+    expect(ineligible.status).toBe(409);
+    expect(await ineligible.json()).toMatchObject({ deterministic_exclusions: expect.arrayContaining([expect.stringContaining("orientation")]) });
+    const prepared = await (await call(runA, "/api/care/coverage-proposals", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm", caregiver_id: "caregiver-jordan", schedule_snapshot_id: context.schedule_snapshot_id, reason: "Jordan passes every explicit eligibility constraint and stays within her stated weekly availability.", idempotency_key: "coverage-stale-setup" }) })).json() as { proposal: { id: string } };
+    await call(runA, `/api/care/coverage-proposals/${prepared.proposal.id}/resolve`, { method: "POST", body: JSON.stringify({ resolution: "dismissed" }) });
+    const stale = await call(runA, "/api/care/coverage-proposals", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm", caregiver_id: "caregiver-jordan", schedule_snapshot_id: context.schedule_snapshot_id, reason: "Retry with a stale schedule snapshot after the shift version changed.", idempotency_key: "coverage-stale-001" }) });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ stale_schedule: true });
   });
 
   it("rejects unsafe channels and oversized bodies", async () => {

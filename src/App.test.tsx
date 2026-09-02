@@ -29,6 +29,20 @@ const baseState: CareState = {
   resident_check_ins: [],
   actions: [],
   handoffs: [],
+  caregivers: [
+    { id: "caregiver-maya", display_name: "Maya Chen", role: "Home care aide", previous_resident_visits: 18, last_resident_shift_at: "2026-08-31T20:00:00-04:00", scheduled_weekly_hours: 32, preferred_max_hours: 40, projected_hours: 35, current_assignment_summary: "Called out", availability: { from: "2026-09-02T17:00:00-04:00", until: "2026-09-02T20:00:00-04:00", status: "unavailable", reason: "Maya called out." }, readiness: { core_training_current: true, role_qualification_current: true, resident_orientation_complete: true, acknowledged_care_plan_version: "v4" } },
+    { id: "caregiver-jordan", display_name: "Jordan Lee", role: "Home care aide", previous_resident_visits: 4, last_resident_shift_at: "2026-08-25T20:00:00-04:00", scheduled_weekly_hours: 36, preferred_max_hours: 40, projected_hours: 39, current_assignment_summary: "Available", availability: { from: "2026-09-02T16:00:00-04:00", until: "2026-09-02T22:00:00-04:00", status: "available", reason: "Full window" }, readiness: { core_training_current: true, role_qualification_current: true, resident_orientation_complete: true, acknowledged_care_plan_version: "v4" } },
+    { id: "caregiver-luis", display_name: "Luis Rivera", role: "Home care aide", previous_resident_visits: 11, last_resident_shift_at: "2026-08-30T20:00:00-04:00", scheduled_weekly_hours: 31, preferred_max_hours: 40, projected_hours: 34, current_assignment_summary: "Prior assignment ends 4:35 PM", availability: { from: "2026-09-02T16:35:00-04:00", until: "2026-09-02T22:00:00-04:00", status: "partial", reason: "Travel window is infeasible." }, readiness: { core_training_current: true, role_qualification_current: true, resident_orientation_complete: true, acknowledged_care_plan_version: "v4" } },
+    { id: "caregiver-elena", display_name: "Elena Brooks", role: "Home care aide", previous_resident_visits: 0, last_resident_shift_at: null, scheduled_weekly_hours: 24, preferred_max_hours: 40, projected_hours: 27, current_assignment_summary: "Available", availability: { from: "2026-09-02T16:00:00-04:00", until: "2026-09-02T22:00:00-04:00", status: "available", reason: "Full window" }, readiness: { core_training_current: true, role_qualification_current: true, resident_orientation_complete: false, acknowledged_care_plan_version: "v3" } }
+  ],
+  shifts: [
+    { id: "shift-wed-am", resident_id: "rose-demo", starts_at: "2026-09-02T09:00:00-04:00", ends_at: "2026-09-02T12:00:00-04:00", required_role: "Home care aide", required_orientation_plan_version: "v4", original_caregiver_id: "caregiver-jordan", assigned_caregiver_id: "caregiver-jordan", next_caregiver_id: "caregiver-maya", coverage_status: "covered", visit_status: "completed", handoff_status: "acknowledged", disruption_reason: null, version: 1 },
+    { id: "shift-wed-pm", resident_id: "rose-demo", starts_at: "2026-09-02T17:00:00-04:00", ends_at: "2026-09-02T20:00:00-04:00", required_role: "Home care aide", required_orientation_plan_version: "v4", original_caregiver_id: "caregiver-maya", assigned_caregiver_id: null, next_caregiver_id: "caregiver-luis", coverage_status: "coverage_needed", visit_status: "not_started", handoff_status: "not_ready", disruption_reason: "Maya called out at 2:15 PM.", version: 1 }
+  ],
+  coverage_proposals: [],
+  visit_events: [],
+  shift_handoffs: [],
+  handoff_acknowledgements: [],
   care_plan: { version: "v4", effective_at: "2026-08-31T07:00:00-04:00", authorized_by: "Nurse Ava", authorization_role: "Care team RN", device_applied_version: "v4", alignment: "aligned" },
   safety_contract: { ai_may: ["Read evidence"], ai_may_not: ["Release medication", "Diagnose", "Contact emergency services"], emergency_notice: "Contact local emergency services in an emergency." }
 };
@@ -47,6 +61,7 @@ function installFetch() {
     if (url.startsWith("/api/care/state")) return Response.json(state);
     if (url === "/api/care/scenario") {
       if (body.scenario === "on_schedule") state = structuredClone(baseState);
+      if (body.scenario === "coverage_callout") state = { ...structuredClone(baseState), resident: { ...baseState.resident, scenario: "coverage_callout", severity: "attention", simulated_time: "2026-09-02T14:15:00-04:00" } };
       if (body.scenario === "missed_window") state = { ...state, evidence_version: 1, resident: { ...state.resident, scenario: "missed_window", severity: "attention" }, doses: state.doses.map((dose, index) => index === 0 ? { ...dose, status: "missed" } : dose), resident_check_ins: [], actions: [], events: [{ ...state.events[0], id: "evt-missed", severity: "attention", summary: "Medication window elapsed" }, ...state.events] };
       if (body.scenario === "care_story") state = { ...state, evidence_version: 1, resident: { ...state.resident, scenario: "care_story", severity: "attention", simulated_time: "2026-09-02T09:42:00-04:00" }, doses: state.doses.map((dose, index) => index === 0 ? { ...dose, status: "missed" } : dose), resident_check_ins: [{ id: "story-check-in", resident_id: "rose-demo", prompt: "Are you okay?", status: "responded", response_code: "im_okay", evidence_snapshot_id: "historical-story-snapshot", idempotency_key: "historical-story-check-in", created_at: "2026-09-01T09:12:00-04:00", responded_at: "2026-09-01T09:14:00-04:00" }], actions: [], handoffs: [], care_story: { ...state.care_story, horizon_hours: 72, starts_at: "2026-08-31T07:00:00-04:00", ends_at: "2026-09-02T09:42:00-04:00", routine_confirmations: 3, unconfirmed_windows: 2, resident_check_ins: 1, routine_activity_signals: 2, summary: "Rose’s routine was largely consistent across three days. Two care-plan signals now require human review.", unresolved: ["Whether either unconfirmed window reflects medication ingestion"], baseline_comparisons: [{ signal: "Morning activity", baseline: "Usually begins by 7:30 AM", observed: "First movement at 9:31 AM", interpretation: "Person-specific change; cause unknown", evidence_status: "changed" }] }, events: [{ ...state.events[0], id: "story-current", event_type: "medication_window_unconfirmed", severity: "attention", summary: "Second monitoring-plan signal in 72 hours", detail: "A second morning medication window lacks confirmation." }, ...state.events] };
       return Response.json({ state });
@@ -83,12 +98,12 @@ function installFetch() {
 beforeEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); installFetch(); });
 
 describe("Grapevine Care", () => {
-  it("opens with the caregiver story and keeps Rose's large-touch view one click away", async () => {
+  it("opens with the caregiver job and keeps Rose's large-touch view one click away", async () => {
     const tools = installModelContext();
     render(<App />);
-    expect(await screen.findByRole("heading", { name: "How Rose has been doing, relative to Rose" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Keep Rose’s care moving—without losing context." })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Caregiver cockpit" })).toHaveClass("active");
-    await waitFor(() => expect(tools.has("prepare_care_team_review")).toBe(true));
+    await waitFor(() => expect(tools.has("get_shift_context") && tools.has("get_coverage_candidates") && tools.has("prepare_shift_coverage")).toBe(true));
     fireEvent.click(screen.getByRole("button", { name: "Reset demo" }));
     fireEvent.click(await screen.findByRole("button", { name: "Rose’s view" }));
     expect(await screen.findByRole("heading", { name: "Good morning, Rose." })).toBeInTheDocument();
@@ -101,7 +116,7 @@ describe("Grapevine Care", () => {
 
   it("shows explicit uncertainty after the missed-window scenario", async () => {
     render(<App />);
-    await screen.findByText("How Rose has been doing, relative to Rose");
+    await screen.findByText("Keep Rose’s care moving—without losing context.");
     fireEvent.click(screen.getByRole("button", { name: "Missed window" }));
     expect(await screen.findByRole("heading", { name: "Rose’s care routine needs attention" })).toBeInTheDocument();
     expect(screen.getByText(/without assuming ingestion/i)).toBeInTheDocument();
@@ -110,7 +125,7 @@ describe("Grapevine Care", () => {
   it("lets the agent prepare a bounded question that only Rose can answer", async () => {
     const tools = installModelContext();
     render(<App />);
-    await screen.findByText("How Rose has been doing, relative to Rose");
+    await screen.findByText("Keep Rose’s care moving—without losing context.");
     fireEvent.click(screen.getByRole("button", { name: "Missed window" }));
     await waitFor(() => expect(tools.has("prepare_resident_check_in")).toBe(true));
     const evidence = await tools.get("get_care_evidence")!.execute({ resident_id: "rose-demo" }) as { evidence_snapshot_id: string };
@@ -127,7 +142,7 @@ describe("Grapevine Care", () => {
   it("stages agent outreach and stops at human review", async () => {
     const tools = installModelContext();
     render(<App />);
-    await screen.findByText("How Rose has been doing, relative to Rose");
+    await screen.findByText("Keep Rose’s care moving—without losing context.");
     fireEvent.click(screen.getByRole("button", { name: "Reset demo" }));
     await waitFor(() => expect(tools.has("prepare_caregiver_check_in")).toBe(true));
     const evidence = await tools.get("get_care_evidence")!.execute({ resident_id: "rose-demo" }) as { evidence_snapshot_id: string };
@@ -139,7 +154,8 @@ describe("Grapevine Care", () => {
   it("turns a compressed 72-hour episode into baseline-aware WebMCP context and a human-gated nurse review", async () => {
     const tools = installModelContext();
     render(<App />);
-    await screen.findByText("How Rose has been doing, relative to Rose");
+    await screen.findByText("Keep Rose’s care moving—without losing context.");
+    fireEvent.click(screen.getByRole("button", { name: "72-hour story" }));
     expect(await screen.findByRole("heading", { name: "How Rose has been doing, relative to Rose" })).toBeInTheDocument();
     expect(screen.getByText(/Two care-plan signals now require human review/i)).toBeInTheDocument();
     await waitFor(() => expect(tools.has("get_resident_context") && tools.has("get_care_story") && tools.has("prepare_care_team_review")).toBe(true));
@@ -156,7 +172,7 @@ describe("Grapevine Care", () => {
 
   it("makes device capability boundaries visible", async () => {
     render(<App />);
-    await screen.findByText("How Rose has been doing, relative to Rose");
+    await screen.findByText("Keep Rose’s care moving—without losing context.");
     fireEvent.click(screen.getByRole("button", { name: "Devices & MCP" }));
     expect(screen.getByRole("heading", { name: "A safe control plane for connected care" })).toBeInTheDocument();
     expect(screen.getByText("compartment.release.local_only")).toBeInTheDocument();

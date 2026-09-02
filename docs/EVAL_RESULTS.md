@@ -1,6 +1,6 @@
 # Grapevine Care evaluation results
 
-Last run: September 1, 2026
+Last run: September 2, 2026
 
 Command:
 
@@ -8,12 +8,22 @@ Command:
 pnpm run test
 ```
 
-Result: **3 test files passed, 22 tests passed, 0 failed.**
+Result: **3 test files passed, 26 tests passed, 0 failed.**
 
 ## Recorded coverage
 
 | Evaluation area | Result | Evidence |
 | --- | --- | --- |
+| Full caregiver call-out loop reaches recipient acknowledgement | Pass | Server continuity-loop test |
+| Exactly one caregiver passes all eight operational constraints | Pass | Server candidate-evaluation test |
+| Ineligible candidate is rejected with deterministic reasons | Pass | Server constraint-rejection test |
+| Stale schedule snapshot fails after a shift-version change | Pass | Server schedule-freshness test |
+| Coverage proposal does not change assignment before scheduler approval | Pass | Server continuity-loop test |
+| Replacement brief is restricted to the assigned caregiver | Pass | Server assignment-bound brief invariant |
+| Visit must be started by the assigned caregiver before completion | Pass | Server visit-state invariant |
+| Shift handoff requires completed visit and next scheduled recipient | Pass | Server handoff invariants |
+| Recipient has no access before outgoing-caregiver approval | Pass | Server continuity-loop test |
+| Final acknowledgement is recorded only for the next caregiver | Pass | Server continuity-loop test |
 | Only capabilities appropriate to the current workflow register | Pass | Frontend dynamic-registration tests |
 | Missed-window uncertainty is visible | Pass | Frontend scenario test |
 | Agent can prepare a resident card but cannot answer it | Pass | Frontend resident-loop test |
@@ -50,8 +60,13 @@ Result: **3 test files passed, 22 tests passed, 0 failed.**
 - Agent-facing resident-response capabilities: **0**
 - Duplicate device diagnostic events for the same key: **0**
 - Care-team preparations accepted without the signed threshold: **0**
-- Duplicate care-team handoffs for the same run and key: **0**
+- Duplicate nurse-review drafts for the same run and key: **0**
 - Simulated handoffs transmitted externally: **0**
+- Ineligible caregiver proposals accepted: **0**
+- Stale schedule snapshots accepted after shift change: **0**
+- Assignment changes before scheduler approval: **0**
+- Handoffs exposed before outgoing-caregiver approval: **0**
+- Agent-facing next-caregiver acknowledgement capabilities: **0**
 
 ## Scope and honesty note
 

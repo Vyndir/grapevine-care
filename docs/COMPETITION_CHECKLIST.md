@@ -19,8 +19,15 @@ Verified against the official challenge and Devpost rules on August 31, 2026.
 - [x] Fictional Rose profile, personal baseline, and care-team-authored monitoring plan
 - [x] Deterministic compressed 72-hour care episode
 - [x] Agent-readable longitudinal care brief with unresolved questions
-- [x] Snapshot-bound nurse review and shift handoff with server-enforced plan threshold
-- [x] Caregiver care cockpit with Now, Story, Care Plan, and Care Circle views
+- [x] Snapshot-bound nurse review with server-enforced plan threshold
+- [x] Nurse review and operational shift handoff separated into non-overlapping workflows
+- [x] Caregiver-first cockpit with Today, Schedule, My Shift, Handoffs, Story, and Care Plan
+- [x] Full call-out recovery loop from disruption through recipient acknowledgement
+- [x] Deterministic eight-constraint caregiver eligibility with no opaque ranking score
+- [x] Schedule-snapshot binding and stale-shift rejection
+- [x] Human-only scheduler approval, visit acknowledgement, handoff approval, and recipient acknowledgement
+- [x] “Since you were last here” assignment brief with unchanged facts and explicit unknowns
+- [x] Simulated EVV events that do not treat missing check-in as proof of absence
 - [x] Responsive, keyboard-focusable, reduced-motion-aware UI
 - [x] Public-repository-ready source, setup, tests, and MIT license
 - [x] Clear source lineage from Project Grapevine
@@ -29,7 +36,7 @@ Verified against the official challenge and Devpost rules on August 31, 2026.
 
 ## Required before final Devpost submission
 
-- [x] Deploy the validated build to a live Sites URL
+- [ ] Deploy the new caregiver-continuity build to the live Sites URL
 - [x] Publish this healthcare adaptation in a public repository
 - [x] Confirm the joint MIT license is visible at the repository root/about area
 - [ ] Record and publicly upload the demo video to YouTube with audio
