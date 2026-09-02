@@ -16,6 +16,11 @@ Verified against the official challenge and Devpost rules on August 31, 2026.
 - [x] Evidence-snapshot binding and stale-state rejection
 - [x] State-dependent WebMCP capability registration
 - [x] Structured evidence chain of custody and safe device diagnostics
+- [x] Fictional Rose profile, personal baseline, and care-team-authored monitoring plan
+- [x] Deterministic compressed 72-hour care episode
+- [x] Agent-readable longitudinal care brief with unresolved questions
+- [x] Snapshot-bound nurse review and shift handoff with server-enforced plan threshold
+- [x] Caregiver care cockpit with Now, Story, Care Plan, and Care Circle views
 - [x] Responsive, keyboard-focusable, reduced-motion-aware UI
 - [x] Public-repository-ready source, setup, tests, and MIT license
 - [x] Clear source lineage from Project Grapevine

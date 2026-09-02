@@ -8,7 +8,7 @@ Command:
 pnpm run test
 ```
 
-Result: **3 test files passed, 17 tests passed, 0 failed.**
+Result: **3 test files passed, 22 tests passed, 0 failed.**
 
 ## Recorded coverage
 
@@ -30,6 +30,11 @@ Result: **3 test files passed, 17 tests passed, 0 failed.**
 | Changed evidence invalidates an older snapshot | Pass | Server snapshot-order test |
 | Resident answer is recorded as self-report, not medication proof | Pass | Server provenance test |
 | Device diagnostic is non-clinical and idempotent | Pass | Server device-check test |
+| 72-hour story uses care-team-authored profile and monitoring rules | Pass | Server longitudinal-context test |
+| Baseline comparison preserves unknown causes | Pass | Server longitudinal-context test |
+| Care-team review requires the signed-plan threshold | Pass | Server threshold-rejection test |
+| Care-team handoff is snapshot-bound and idempotent | Pass | Server handoff test |
+| Caregiver sees the care brief and visible nurse-review gate | Pass | Frontend longitudinal WebMCP test |
 | Missing/invalid run identity is rejected | Pass | Server boundary test |
 | Oversized request body is rejected even without content length | Pass | Server input test |
 
@@ -44,6 +49,9 @@ Result: **3 test files passed, 17 tests passed, 0 failed.**
 - Stale-snapshot caregiver preparations accepted after new evidence: **0**
 - Agent-facing resident-response capabilities: **0**
 - Duplicate device diagnostic events for the same key: **0**
+- Care-team preparations accepted without the signed threshold: **0**
+- Duplicate care-team handoffs for the same run and key: **0**
+- Simulated handoffs transmitted externally: **0**
 
 ## Scope and honesty note
 

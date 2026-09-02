@@ -7,13 +7,34 @@ Fictional device adapters
   └─ emit scoped signals + provenance
        └─ D1 evidence model
             ├─ Resident UI: local confirmation + bounded self-report
-            ├─ Caregiver UI: evidence + explicit review
+            ├─ Caregiver UI: Now + Story + Care Plan + Care Circle
             └─ WebMCP: state-dependent evidence and preparation tools
 
 Medication release: deterministic device controller only
 Caregiver outreach: human approval only
 Medical and emergency decisions: outside the product
 ```
+
+## Longitudinal care layer
+
+The 72-hour episode adds three D1-backed concepts without changing the existing
+authority model:
+
+- `care_demo_profiles` stores Rose's fictional care-team-supplied history,
+  routine, support arrangement, and preferences.
+- `care_demo_monitoring_rules` stores the signed instructions that determine
+  what the care circle should review. The agent cannot author these rules.
+- `care_demo_handoffs` stores snapshot-bound nurse-review or shift-handoff
+  drafts and their explicit caregiver decision.
+
+`get_resident_context` separates clinical/care-team facts from personal
+baseline and preferences. `get_care_story` returns a bounded 24/72-hour summary,
+baseline comparisons, provenance, and unresolved questions. A difference from
+baseline is represented as a coordination signal—not as a diagnosis.
+
+When the seeded story contains two unconfirmed medication windows within 72
+hours, the server—not the model—matches the signed plan threshold before
+`prepare_care_team_review` can succeed.
 
 The browser page is the WebMCP server. Agents discover tools in the same page a
 person is using, so the visible interface and tool results share one workflow
@@ -45,6 +66,17 @@ Device observation
   → caregiver approves or dismisses
 ```
 
+The longitudinal branch extends this safely:
+
+```text
+Read Rose's authorized context
+  → summarize 72-hour evidence relative to her baseline
+  → preserve unresolved causes
+  → verify the signed monitoring threshold
+  → prepare nurse review or shift handoff from a current snapshot
+  → caregiver approves or dismisses
+```
+
 Each evidence-changing transition increments `evidence_version`. The server
 stores the version captured by `get_care_evidence` and rejects preparation from
 an older snapshot. This makes tool order a server invariant rather than a
@@ -67,8 +99,8 @@ medication.
 
 D1 stores an isolated fictional run for each browser session. Every medication
 window, device, inventory record, evidence snapshot, resident question, event,
-diagnostic, and staged action is keyed by
-the opaque `demo_run_id` sent in a same-origin header. Indexed query paths begin
+profile, monitoring rule, care-team handoff, diagnostic, and staged action is
+keyed by the opaque `demo_run_id` sent in a same-origin header. Indexed query paths begin
 with that run ID; a composite unique constraint prevents duplicate idempotency
 keys within a run without coupling different judges.
 

@@ -1,7 +1,7 @@
 {
   "name": "grapevine-care-webmcp",
   "version": "0.1.0",
-  "description": "Grapevine Care, a safety-first elder medication support simulation using WebMCP.",
+  "description": "Grapevine Care, a safety-first longitudinal elder care coordination simulation using WebMCP.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -29,7 +29,7 @@
   "type": "module",
   "scripts": {
     "start": "vite dev",
-    "db:local": "wrangler d1 execute grapevine-care --local --file drizzle/0001_grapevine_care.sql && wrangler d1 execute grapevine-care --local --file drizzle/0002_demo_run_isolation.sql && wrangler d1 execute grapevine-care --local --file drizzle/0003_evidence_resolution_loop.sql",
+    "db:local": "wrangler d1 execute grapevine-care --local --file drizzle/0001_grapevine_care.sql && wrangler d1 execute grapevine-care --local --file drizzle/0002_demo_run_isolation.sql && wrangler d1 execute grapevine-care --local --file drizzle/0003_evidence_resolution_loop.sql && wrangler d1 execute grapevine-care --local --file drizzle/0004_longitudinal_care_story.sql",
     "build": "vite build",
     "deploy": "vite build && wrangler deploy",
     "audit:public": "node scripts/audit-public.mjs",

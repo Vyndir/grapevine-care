@@ -1,17 +1,17 @@
 # Grapevine Care
 
 Grapevine Care is a safety-first WebMCP prototype showing how an AI agent, a
-caregiver, and a connected medication dispenser could share structured evidence
-without handing medical or emergency decisions to the agent.
+caregiver, care-team reviewer, and connected devices could understand a person's
+story over time without handing medical or emergency decisions to the agent.
 
 The experience has three coordinated surfaces:
 
 - **Rose’s station** gives an older adult a calm, large-touch medication-window
   experience. A simulated local biometric attestation can confirm the currently
   eligible compartment.
-- **Caregiver workspace** separates device evidence from interpretation, shows
-  uncertainty explicitly, forecasts inventory, and requires a person to review
-  any staged check-in.
+- **Caregiver care cockpit** combines Now, Story, Care Plan, and Care Circle
+  views. It compares observations with Rose's care-team-authored baseline and
+  requires a person to review every staged check-in or handoff.
 - **Devices & WebMCP** makes the tool contract, device capabilities, provenance,
   and non-negotiable safety boundaries visible.
 
@@ -22,7 +22,7 @@ for professional care.
 
 ## WebMCP collaboration model
 
-Grapevine Care defines eight bounded tools and exposes only the subset appropriate
+Grapevine Care defines eleven bounded tools and exposes only the subset appropriate
 to the current human workflow state through `document.modelContext.registerTool(...)`:
 
 | Tool | Agent contribution | Boundary |
@@ -35,6 +35,9 @@ to the current human workflow state through `document.modelContext.registerTool(
 | `prepare_resident_check_in` | Places one bounded question on Rose’s station | The agent cannot answer for Rose or interpret her response as medication proof |
 | `prepare_caregiver_check_in` | Stages a call, visit, or message from a current snapshot | No one is contacted until a person approves; the demo has no external messaging integration |
 | `request_device_health_snapshot` | Requests a fresh non-clinical diagnostic | Cannot control the device or return clinical readings |
+| `get_resident_context` | Reads Rose's fictional profile, documented baseline, preferences, and monitoring rules | Context is care-team supplied; the agent cannot invent clinical significance |
+| `get_care_story` | Summarizes 24/72 hours relative to Rose's baseline | Differences are coordination signals, not diagnoses |
+| `prepare_care_team_review` | Stages a nurse review or shift handoff from a current snapshot | Server requires the signed-plan threshold and visible caregiver approval; nothing is transmitted |
 
 The capability set is state-dependent. During a pending resident response or
 caregiver review, preparation tools disappear. Every human or device
@@ -49,27 +52,29 @@ diagnose, determine that an emergency exists, or contact emergency services.
 ## Judge demo
 
 1. Open the deployed site in ChatGPT’s in-app browser and allow site tools.
-2. In the **Judge demo** bar, select **Missed window**.
+2. In the **Judge demo** bar, select **72-hour story** and open **Caregiver**.
 3. Ask ChatGPT:
 
-   > Rose’s medication window passed and I cannot tell what actually happened.
-   > Use this page’s tools to determine what the system knows, safely resolve
-   > any missing information you can, and help prepare the appropriate human
-   > next step. Do not diagnose, recommend a medication decision, answer for
-   > Rose, or claim anyone was contacted.
+   > How has Rose been doing over the last 72 hours? Use this page's tools to
+   > compare her care story with her signed monitoring plan and personal
+   > baseline. Explain what is known and still unresolved. If the authorized
+   > criteria are met, prepare the appropriate human care-team review. Do not
+   > diagnose, change medication, invent clinical significance, or claim
+   > anything was sent.
 
-4. ChatGPT should inspect current evidence, receive an `evidence_snapshot_id`,
-   and call `prepare_resident_check_in`. A question appears on Rose’s station.
-5. Switch to **Resident** and let Rose choose one bounded response. The agent
-   cannot press these controls. The old evidence snapshot is now stale.
-6. Ask ChatGPT to continue. It must call `get_care_evidence` again before
-   `prepare_caregiver_check_in` becomes valid.
-7. The visible review drawer opens. Confirm that it states **No one has been
-   contacted**, then approve or dismiss the simulated action.
-8. Switch to **Devices & MCP** to show the changing capability set, evidence
+4. ChatGPT should call `get_resident_context`, `get_care_story`, and
+   `get_care_evidence`. It should distinguish confirmed routine, Rose's
+   self-report, two unconfirmed windows, and a later-than-baseline activity
+   signal without assigning a cause.
+5. `prepare_care_team_review` becomes the bounded next step because the signed
+   plan's repeated-gap threshold is present. The server binds it to the current
+   evidence snapshot.
+6. The visible review drawer opens. Confirm that it states **Nothing has been
+   sent or transmitted**, then approve or dismiss the simulated nurse review.
+7. Switch to **Devices & MCP** to show the changing capability set, evidence
    chain of custody, signed care-plan provenance, and safe device diagnostic.
-   boundaries. Use the reset control to return to the deterministic starting
-   state.
+8. Optionally reset to **Missed window** to demonstrate the original
+   device → agent → Rose → agent → caregiver evidence-resolution loop.
 
 ## Competition alignment
 
@@ -82,6 +87,10 @@ This project is designed for the OpenAI WebMCP Challenge:
   remove agent preparation tools.
 - Snapshot binding server-enforces the sequence observe → request evidence →
   re-observe → prepare → human decides.
+- Longitudinal tools compare events with Rose's own documented baseline and
+  care-team-authored monitoring rules—not a generic or model-invented norm.
+- A 72-hour care brief coordinates resident, device, caregiver, and nurse roles
+  while retaining explicit unresolved questions.
 - Resident and device contributions are structured by actor, evidence class,
   observed time, trust boundary, and care-plan version.
 - Tool outputs contain source, observation time, calculation details, and

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CareEvent, CareState, PreparedAction, ResidentCheckIn, ResidentResponseCode, Scenario } from "./schemas";
+import type { CareEvent, CareState, CareTeamHandoff, PreparedAction, ResidentCheckIn, ResidentResponseCode, Scenario } from "./schemas";
 
 const demoRunStorageKey = "grapevine-care-demo-run";
 
@@ -31,7 +31,9 @@ export type CareActions = {
   respondResidentCheckIn(checkInId: string, responseCode: ResidentResponseCode): Promise<CareState>;
   prepareAction(input: { resident_id: string; channel: PreparedAction["channel"]; reason: string; evidence_snapshot_id: string; idempotency_key: string; }): Promise<{ action: PreparedAction; approval_required: true; external_side_effect: false; }>;
   requestDeviceHealthSnapshot(input: { resident_id: string; device_id: string; idempotency_key: string; }): Promise<{ fictional: true; diagnostic: Record<string, unknown>; external_side_effect: false; duplicate_prevented: boolean; evidence_changed: boolean; next_step?: string; }>;
+  prepareCareTeamReview(input: { resident_id: string; review_type: CareTeamHandoff["review_type"]; period_hours: 24 | 72; reason: string; evidence_snapshot_id: string; idempotency_key: string; }): Promise<{ handoff: CareTeamHandoff; approval_required: true; external_side_effect: false; }>;
   resolveAction(actionId: string, resolution: "approved_in_demo" | "dismissed"): Promise<CareState>;
+  resolveCareTeamReview(handoffId: string, resolution: "approved_in_demo" | "dismissed"): Promise<CareState>;
 };
 
 export function useCare() {
@@ -98,6 +100,12 @@ export function useCare() {
     return result;
   }, [refresh]);
 
+  const prepareCareTeamReview = useCallback(async (input: { resident_id: string; review_type: CareTeamHandoff["review_type"]; period_hours: 24 | 72; reason: string; evidence_snapshot_id: string; idempotency_key: string; }) => {
+    const result = await api<Awaited<ReturnType<CareActions["prepareCareTeamReview"]>>>("/api/care/handoffs", demoRunIdRef.current, { method: "POST", body: JSON.stringify(input) });
+    await refresh();
+    return result;
+  }, [refresh]);
+
   const resolveAction = useCallback(async (actionId: string, resolution: "approved_in_demo" | "dismissed") => {
     setBusy(true);
     try {
@@ -106,6 +114,14 @@ export function useCare() {
     } finally { setBusy(false); }
   }, [commit]);
 
-  const actions = useMemo<CareActions>(() => ({ getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, resolveAction }), [getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, resolveAction]);
+  const resolveCareTeamReview = useCallback(async (handoffId: string, resolution: "approved_in_demo" | "dismissed") => {
+    setBusy(true);
+    try {
+      const result = await api<{ state: CareState }>(`/api/care/handoffs/${encodeURIComponent(handoffId)}/resolve`, demoRunIdRef.current, { method: "POST", body: JSON.stringify({ resolution }) });
+      return commit(result.state);
+    } finally { setBusy(false); }
+  }, [commit]);
+
+  const actions = useMemo<CareActions>(() => ({ getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview }), [getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview]);
   return { state, error, setError, busy, actions };
 }

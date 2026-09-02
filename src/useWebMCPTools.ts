@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getCareEvidenceArgsSchema,
+  getCareStoryArgsSchema,
   getCareOverviewArgsSchema,
+  getResidentContextArgsSchema,
   getDeviceCapabilitiesArgsSchema,
   getInventoryForecastArgsSchema,
   getMedicationScheduleArgsSchema,
   parseArgs,
   prepareCaregiverCheckInArgsSchema,
+  prepareCareTeamReviewArgsSchema,
   prepareResidentCheckInArgsSchema,
   requestDeviceHealthSnapshotArgsSchema,
   toolInputSchemas,
@@ -39,12 +42,15 @@ export function expectedToolNames(state: CareState | null, workspace: WebMCPWork
   const names = ["get_care_overview", "get_medication_schedule", "get_care_evidence"];
   const residentCheckIn = state.resident_check_ins[0];
   const pendingAction = state.actions.some((action) => action.status === "awaiting_human_approval");
-  const workflowLocked = residentCheckIn?.status === "awaiting_resident" || pendingAction;
+  const pendingHandoff = state.handoffs.some((handoff) => handoff.status === "awaiting_human_approval");
+  const workflowLocked = residentCheckIn?.status === "awaiting_resident" || pendingAction || pendingHandoff;
+  names.push("get_resident_context", "get_care_story");
   if (state.resident.scenario === "on_schedule" && !workflowLocked) names.push("get_inventory_forecast");
   if ((workspace === "system" || state.resident.scenario === "device_offline" || state.resident.scenario === "door_fault") && !workflowLocked) names.push("get_device_capabilities", "request_device_health_snapshot");
   if (state.resident.scenario === "missed_window" && !residentCheckIn && !pendingAction) names.push("prepare_resident_check_in");
   const residentResolved = residentCheckIn?.status === "responded";
-  if (!pendingAction && !workflowLocked && (state.resident.scenario !== "missed_window" || residentResolved)) names.push("prepare_caregiver_check_in");
+  if (!pendingAction && !pendingHandoff && !workflowLocked && state.resident.scenario !== "care_story" && (state.resident.scenario !== "missed_window" || residentResolved)) names.push("prepare_caregiver_check_in");
+  if (state.resident.scenario === "care_story" && !workflowLocked) names.push("prepare_care_team_review");
   return names;
 }
 
@@ -97,6 +103,40 @@ export function useWebMCPTools(actions: CareActions, state: CareState | null, wo
       inputSchema: toolInputSchemas.getCareEvidence, annotations: { ...baseAnnotations, readOnlyHint: true },
       async execute(args: unknown) { return actions.getEvidenceSnapshot(parseArgs(getCareEvidenceArgsSchema, args)); }
     } satisfies WebMCPTool,
+    context: {
+      name: "get_resident_context", title: "Get Rose’s authorized context",
+      description: "Read Rose’s fictional profile, documented routine, preferences, and care-team-authored monitoring rules. These records provide person-specific context but do not authorize diagnosis or treatment decisions.",
+      inputSchema: toolInputSchemas.getResidentContext, annotations: { ...baseAnnotations, readOnlyHint: true },
+      async execute(args: unknown) {
+        const { resident_id } = parseArgs(getResidentContextArgsSchema, args); const current = await actions.getState();
+        if (current.resident.id !== resident_id) throw new Error("Resident not found in this demo.");
+        return { fictional: true, profile: current.profile, monitoring_plan: current.monitoring_plan, care_plan: current.care_plan, interpretation_boundary: "The care team defines what to monitor. The agent may compare evidence with those instructions but cannot invent clinical significance." };
+      }
+    } satisfies WebMCPTool,
+    story: {
+      name: "get_care_story", title: "Get longitudinal care story",
+      description: "Summarize Rose’s last 24 or 72 hours relative to her documented baseline and signed monitoring plan. Returns counts, comparisons, provenance, and unresolved questions without diagnosing causes.",
+      inputSchema: toolInputSchemas.getCareStory, annotations: { ...baseAnnotations, readOnlyHint: true },
+      async execute(args: unknown) {
+        const { resident_id, horizon = "72_hours" } = parseArgs(getCareStoryArgsSchema, args); const current = await actions.getState();
+        if (current.resident.id !== resident_id) throw new Error("Resident not found in this demo.");
+        const requestedHours = horizon === "24_hours" ? 24 : 72;
+        const startsAt = new Date(Date.parse(current.resident.simulated_time) - requestedHours * 60 * 60 * 1000).toISOString();
+        const recentEvents = current.events.filter((event) => Date.parse(event.observed_at) >= Date.parse(startsAt));
+        const story = requestedHours === current.care_story.horizon_hours ? current.care_story : {
+          ...current.care_story,
+          horizon_hours: requestedHours,
+          starts_at: startsAt,
+          routine_confirmations: recentEvents.filter((event) => event.event_type === "dose_confirmed").length,
+          unconfirmed_windows: recentEvents.filter((event) => event.event_type === "medication_window_unconfirmed" || event.event_type === "scenario_missed_window").length,
+          resident_check_ins: recentEvents.filter((event) => event.event_type === "resident_self_report").length,
+          routine_activity_signals: recentEvents.filter((event) => event.event_type === "routine_activity").length,
+          device_interruptions: recentEvents.filter((event) => event.event_type === "scenario_device_offline" || event.event_type === "device_offline").length,
+          summary: "This 24-hour slice contains the latest care-plan signals only. Use the 72-hour view to evaluate the repeated-pattern threshold."
+        };
+        return { fictional: true, requested_horizon_hours: requestedHours, story, recent_evidence: recentEvents.map(({ id, event_type, severity, summary, detail, actor_type, evidence_type, observed_at, trust_boundary, plan_version }) => ({ id, event_type, severity, summary, detail, actor_type, evidence_type, observed_at, trust_boundary, plan_version })), boundary: "Baseline differences are care-coordination signals, not diagnoses or proof of medication ingestion." };
+      }
+    } satisfies WebMCPTool,
     residentCheckIn: {
       name: "prepare_resident_check_in", title: "Prepare resident check-in",
       description: "Place one bounded, non-clinical question on Rose's visible station. The agent cannot answer for Rose, contact her elsewhere, release medication, or interpret her response as clinical verification. Requires a current evidence snapshot.",
@@ -114,6 +154,12 @@ export function useWebMCPTools(actions: CareActions, state: CareState | null, wo
       description: "Request a fresh non-clinical diagnostic from a registered simulated device. Returns connectivity, sensor health, battery, firmware, door state, last seen, and applied plan version—never medication release or clinical readings.",
       inputSchema: toolInputSchemas.requestDeviceHealthSnapshot, annotations: baseAnnotations,
       async execute(args: unknown) { return actions.requestDeviceHealthSnapshot(parseArgs(requestDeviceHealthSnapshotArgsSchema, args)); }
+    } satisfies WebMCPTool,
+    careTeamReview: {
+      name: "prepare_care_team_review", title: "Prepare care-team review",
+      description: "Stage a snapshot-bound 24/72-hour nurse review or caregiver shift handoff when Rose’s signed monitoring criteria are met. Nothing is transmitted until a caregiver approves the visible draft. Cannot diagnose or change the care plan.",
+      inputSchema: toolInputSchemas.prepareCareTeamReview, annotations: baseAnnotations,
+      async execute(args: unknown) { return actions.prepareCareTeamReview(parseArgs(prepareCareTeamReviewArgsSchema, args)); }
     } satisfies WebMCPTool
   }), [actions]);
 
@@ -125,10 +171,14 @@ export function useWebMCPTools(actions: CareActions, state: CareState | null, wo
     useWebMCPTool(enabled.has(tools.inventory.name) ? tools.inventory : null),
     useWebMCPTool(enabled.has(tools.devices.name) ? tools.devices : null),
     useWebMCPTool(enabled.has(tools.evidence.name) ? tools.evidence : null),
+    useWebMCPTool(enabled.has(tools.context.name) ? tools.context : null),
+    useWebMCPTool(enabled.has(tools.story.name) ? tools.story : null),
     useWebMCPTool(enabled.has(tools.residentCheckIn.name) ? tools.residentCheckIn : null),
     useWebMCPTool(enabled.has(tools.prepare.name) ? tools.prepare : null),
-    useWebMCPTool(enabled.has(tools.deviceHealth.name) ? tools.deviceHealth : null)
+    useWebMCPTool(enabled.has(tools.deviceHealth.name) ? tools.deviceHealth : null),
+    useWebMCPTool(enabled.has(tools.careTeamReview.name) ? tools.careTeamReview : null)
   ];
-  const activeRegistrations = registrations.filter((_, index) => enabled.has([tools.overview, tools.schedule, tools.inventory, tools.devices, tools.evidence, tools.residentCheckIn, tools.prepare, tools.deviceHealth][index].name));
+  const orderedTools = [tools.overview, tools.schedule, tools.inventory, tools.devices, tools.evidence, tools.context, tools.story, tools.residentCheckIn, tools.prepare, tools.deviceHealth, tools.careTeamReview];
+  const activeRegistrations = registrations.filter((_, index) => enabled.has(orderedTools[index].name));
   return { supported: registrations.some((item) => item.supported), registered: activeRegistrations.length > 0 && activeRegistrations.every((item) => item.registered), error: activeRegistrations.find((item) => item.error)?.error ?? null, count: activeRegistrations.filter((item) => item.registered).length, availableNames };
 }

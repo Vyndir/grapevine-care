@@ -8,7 +8,10 @@ export const careTables = [
   "care_demo_actions",
   "care_demo_evidence_snapshots",
   "care_demo_resident_check_ins",
-  "care_demo_device_checks"
+  "care_demo_device_checks",
+  "care_demo_profiles",
+  "care_demo_monitoring_rules",
+  "care_demo_handoffs"
 ] as const;
 
 export type CareTable = (typeof careTables)[number];

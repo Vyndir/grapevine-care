@@ -10,21 +10,22 @@ Devices observe. Agents structure evidence. People stay in control.
 
 ## Inspiration
 
-Rose's morning medication window ends without a removal confirmation. Her
-caregiver should not have to manually reconcile a dispenser alert, schedule,
-device status, inventory level, and activity history—and an AI should not guess
-what happened. Grapevine Care gives an agent structured evidence through
-WebMCP, lets it explain what is known and unknown, and lets it prepare the next
-human check-in without gaining authority over medication or emergency decisions.
+Rose's caregiver needs to know more than whether one alert fired: how Rose has
+been doing relative to her own routine, what her care team asked the family to
+watch, and what remains unknown. Grapevine Care turns three days of fictional
+resident, device, caregiver, and care-team evidence into a source-visible care
+story without letting the agent invent clinical meaning.
 
 ## What it does
 
 The fictional, per-browser demo connects an elder-friendly medication station,
-caregiver workspace, and extensible device registry. When a medication removal
-is unconfirmed, the agent reads a versioned evidence snapshot, prepares a
-bounded question that only Rose can answer, re-reads the changed evidence, and
-then may prepare—but never send—a caregiver check-in. A person approves or
-dismisses the final action.
+caregiver care cockpit, signed monitoring plan, care circle, and extensible
+device registry. A compressed 72-hour episode establishes Rose's routine,
+introduces an ambiguous medication gap, records Rose's bounded self-report,
+shows routine activity resuming, and then introduces a second care-plan-relevant
+change. WebMCP lets an agent read Rose's authorized context, summarize the
+longitudinal story, preserve unresolved questions, and prepare—but never
+transmit—a nurse review or shift handoff. A caregiver approves or dismisses it.
 
 ## How we built it
 
@@ -40,10 +41,12 @@ hosts the project.
 Without WebMCP, an agent would scrape cards, infer status colors, and click
 controls meant for people. Grapevine Care exposes the exact evidence model and
 workflow boundary: actor identity, evidence class, observation time, trust
-boundary, plan version, uncertainty, and state-dependent capabilities. The
+boundary, plan version, personal baseline, signed monitoring rule, uncertainty,
+and state-dependent capabilities. The
 server rejects stale evidence and the page removes preparation tools during
 human decisions. The agent can coordinate without pretending it dispensed
 medication, answered for Rose, or contacted a caregiver.
+It can recognize “different for Rose” without claiming “clinically abnormal.”
 
 ## Challenges
 
@@ -62,6 +65,12 @@ the interface.
 - Dynamic WebMCP capabilities that appear and disappear with workflow state.
 - Structured chain-of-custody provenance and signed care-plan source identity.
 - Safe, idempotent device diagnostics without remote-control authority.
+- Rose profile, personal baseline, care preferences, and care-team-authored
+  monitoring rules with explicit source provenance.
+- A deterministic 72-hour care story and agent-readable longitudinal care brief.
+- A server-enforced signed-plan threshold for nurse review or shift handoff.
+- Care-team handoffs that are snapshot-bound, idempotent, approval-gated, and
+  never transmitted by the simulation.
 - Explicit uncertainty for missed windows and stale devices.
 - Elder, caregiver, and device/MCP surfaces in one shared application.
 - A capability adapter that can support future equipment without granting

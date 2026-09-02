@@ -2,75 +2,75 @@
 
 ## 0:00–0:12 — WebMCP immediately
 
-Begin with **Missed window** active. Ask the natural judge prompt. Show
-`get_care_overview` and `get_care_evidence` returning a current snapshot.
+Begin with **72-hour story** active in the Caregiver workspace. Ask:
 
-“Rose's medication window ended without a removal confirmation. That is a care
-signal—not proof she missed a dose and not proof of an emergency.”
+> How has Rose been doing over the last 72 hours? Compare her story with her
+> signed monitoring plan and personal baseline. Explain what is known and still
+> unresolved. If the authorized criteria are met, prepare the appropriate human
+> care-team review. Do not diagnose or claim anything was sent.
 
-## 0:12–0:30 — The human problem
+Show `get_resident_context` and `get_care_story` within the first seconds.
 
-Show the caregiver workspace beside the agent response.
+## 0:12–0:37 — Rose is a person, not an alert
 
-“A caregiver should not have to manually reconcile a schedule, dispenser
-status, inventory, and device history—and an AI should not guess what happened.”
+Open **Care Plan**: Rose is 79, lives independently, has documented routines and
+preferences, and Nurse Ava authored the fictional monitoring rules.
 
-## 0:30–1:02 — Agent requests missing human evidence
+“The agent does not invent what matters medically. The care team defines what
+to watch; WebMCP gives the agent structured, source-labeled context.”
 
-Let ChatGPT call `prepare_resident_check_in`. Switch to Rose's station as the
-bounded card appears.
+## 0:37–1:08 — Three days become a care story
 
-“The agent did not text Rose, answer for her, or escalate. It made a safe human
-surface available.”
+Open **Story**. Show Day 1 routine confirmations; Day 2 unconfirmed window,
+Rose's “I'm okay” self-report, and resumed activity; then Day 3's second gap and
+later-than-baseline movement.
 
-Select **I'm okay** as Rose. Point out that the response is self-report—not
-medication confirmation and not clinical verification.
+“Rose's response is useful resident evidence, but it does not prove medication
+ingestion. Presence data is context, not a welfare or clinical conclusion.”
 
-## 1:02–1:34 — Evidence changed; agent must re-observe
+## 1:08–1:35 — Baseline-aware, uncertainty-preserving reasoning
 
-Ask ChatGPT to continue. The earlier snapshot is now stale, so the server
-requires another `get_care_evidence` call. Show both facts in the result:
+Point to **What changed for Rose?**, the care brief counts, and **Still
+unresolved**.
 
-- device: removal was not confirmed;
-- resident: Rose reports that she is okay.
+“Grapevine does not compare Rose with a generic definition of normal. It
+compares observations with her authorized baseline and keeps unknowns visible.”
 
-“Grapevine records who says what, when they knew it, and what authority that
-source has.”
+## 1:35–2:02 — Agent prepares; caregiver decides
 
-## 1:34–1:58 — Agent prepares; caregiver decides
+Let ChatGPT call `get_care_evidence`, then `prepare_care_team_review`. The server
+requires a current snapshot and verifies that two gaps match the signed plan.
 
-Let ChatGPT call `prepare_caregiver_check_in`. When the review drawer opens:
+When the drawer opens, show:
 
-“The agent prepared; it did not perform. No call, message, visit, medication
-change, diagnosis, or emergency determination has occurred.”
+- nothing has been sent or transmitted;
+- no diagnosis or emergency determination was made;
+- no medication or care plan changed.
 
-Approve or dismiss the simulated action in the visible human surface.
+Approve or dismiss the simulated review.
 
-## 1:58–2:12 — Capabilities follow workflow state
+## 2:02–2:25 — Capabilities follow the care workflow
 
-Open **Devices & MCP**. Show that preparation tools appear and disappear as the
-workflow changes. Explain that safety is enforced by capability availability
-and snapshot validation, not only prompt wording.
+Open **Devices & MCP**. Show that preparation tools disappear while a human
+decision is pending and that the 11-tool catalog exposes only the current safe
+subset.
 
-## 2:12–2:31 — Extensible evidence plane
+“Safety is enforced by server state, snapshot freshness, idempotency, and human
+surfaces—not only by prompt wording.”
 
-Show `grapevine.care.device.v1`, signed Care Plan v4 provenance, and the safe
-device-health snapshot capability.
+## 2:25–2:45 — The original evidence-resolution loop
 
-“Heterogeneous devices become understandable to agents without becoming
-controllable by agents.”
+Briefly reset to **Missed window** and explain the optional second path:
 
-## 2:31–2:47 — Reliability evidence
+device → agent → Rose → changed evidence → agent → caregiver.
 
-Briefly show the public repository, server invariant tests, evaluation results,
-safety case, and joint MIT license. Mention full reset and cross-browser
-isolation.
+Only Rose can answer her card; the agent must re-observe after her response.
 
-## 2:47–2:59 — Close
+## 2:45–2:59 — Close
 
-“A device detects uncertainty. The agent does not guess. It gathers missing
-human evidence, re-observes the changed state, prepares the next step, and
-stops at the person with authority.”
+“Grapevine Care helps people understand and coordinate a person's life over
+time. Devices observe, agents organize context, and responsible humans remain
+the source of truth and authority.”
 
 ## Recording checklist
 
@@ -78,5 +78,5 @@ stops at the person with authority.”
 - Show a real WebMCP call within the first 12 seconds.
 - Record at 1080p with readable browser zoom and clear audio.
 - Show the deployed URL and real tool calls.
-- Use no third-party music, logos, or private data.
+- Use no third-party music, logos, protected health information, or private data.
 - Upload publicly to YouTube and add the link to Devpost.

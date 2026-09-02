@@ -36,7 +36,7 @@ diminish either contributor's authorship or licensing rights.
 
 ## New WebMCP contract
 
-Grapevine Care defines eight healthcare-specific tools and exposes only the
+Grapevine Care defines eleven healthcare-specific tools and exposes only the
 subset appropriate to the current human workflow state:
 
 1. `get_care_overview`
@@ -47,10 +47,14 @@ subset appropriate to the current human workflow state:
 6. `prepare_resident_check_in`
 7. `prepare_caregiver_check_in`
 8. `request_device_health_snapshot`
+9. `get_resident_context`
+10. `get_care_story`
+11. `prepare_care_team_review`
 
 These are not renamed disaster-logistics operations. They use a distinct care
 evidence model, a resident evidence-resolution loop, versioned evidence
-snapshots, dynamic capability registration, and different approval semantics.
+snapshots, longitudinal baseline comparison, dynamic capability registration,
+and different approval semantics.
 The agent can place a bounded question on Rose's station but cannot answer it;
 only Rose's visible controls can contribute her self-report. Any evidence change
 invalidates older snapshot IDs. A later caregiver action remains reversible and
@@ -65,7 +69,7 @@ not exposed to agents.
 - Live application: https://grapevine-care.miles-g.chatgpt.site/
 - Package: `grapevine-care-webmcp`
 - Database and migrations: `grapevine-care` / `drizzle/0001_grapevine_care.sql`
-  through `drizzle/0003_evidence_resolution_loop.sql`
+  through `drizzle/0004_longitudinal_care_story.sql`
 - Architecture, safety case, demo script, submission copy, competition
   checklist, and evaluation matrix are maintained within this repository.
 

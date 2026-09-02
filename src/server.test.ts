@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import worker from "./server";
-import type { CareState, PreparedAction, ResidentCheckIn, Scenario } from "./schemas";
+import type { CareState, CareTeamHandoff, PreparedAction, ResidentCheckIn, Scenario } from "./schemas";
 
 class TestStatement {
   constructor(private database: DatabaseSync, private sql: string, private bindings: SQLInputValue[] = []) {}
@@ -36,6 +36,7 @@ class TestD1 {
     this.sqlite.exec(readFileSync(new URL("../drizzle/0001_grapevine_care.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0002_demo_run_isolation.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0003_evidence_resolution_loop.sql", import.meta.url), "utf8"));
+    this.sqlite.exec(readFileSync(new URL("../drizzle/0004_longitudinal_care_story.sql", import.meta.url), "utf8"));
   }
   close() { this.sqlite.close(); }
 }
@@ -190,6 +191,38 @@ describe("Grapevine Care server invariants", () => {
     expect(second.evidence_changed).toBe(false);
     expect(second.duplicate_prevented).toBe(true);
     expect((await state(runA)).events.filter((event) => event.event_type === "device_health_snapshot")).toHaveLength(1);
+  });
+
+  it("builds a baseline-aware 72-hour story from care-team-authored context", async () => {
+    await scenario(runA, "care_story");
+    const current = await state(runA);
+    expect(current.profile).toMatchObject({ age: 79, source: expect.stringContaining("Care Plan v4") });
+    expect(current.monitoring_plan).toHaveLength(3);
+    expect(current.care_story).toMatchObject({ horizon_hours: 72, unconfirmed_windows: 2, resident_check_ins: 1, device_interruptions: 0 });
+    expect(current.care_story.summary).toContain("Neither observation establishes ingestion, illness, or an emergency");
+    expect(current.care_story.baseline_comparisons.find((item) => item.signal === "Morning activity")).toMatchObject({ evidence_status: "changed" });
+  });
+
+  it("prepares and resolves one snapshot-bound care-team handoff without transmission", async () => {
+    await scenario(runA, "care_story");
+    const currentSnapshot = await snapshot(runA);
+    const body = JSON.stringify({ resident_id: "rose-demo", review_type: "nurse_review", period_hours: 72, reason: "Two care-plan monitoring signals occurred within 72 hours; qualified human review is requested without a clinical conclusion.", evidence_snapshot_id: currentSnapshot.evidence_snapshot_id, idempotency_key: "care-team-review-001" });
+    const first = await (await call(runA, "/api/care/handoffs", { method: "POST", body })).json() as { handoff: CareTeamHandoff; duplicate_prevented: boolean; external_side_effect: boolean };
+    const duplicate = await (await call(runA, "/api/care/handoffs", { method: "POST", body })).json() as { handoff: CareTeamHandoff; duplicate_prevented: boolean };
+    expect(first.external_side_effect).toBe(false);
+    expect(duplicate.duplicate_prevented).toBe(true);
+    expect(duplicate.handoff.id).toBe(first.handoff.id);
+    const resolved = await (await call(runA, `/api/care/handoffs/${first.handoff.id}/resolve`, { method: "POST", body: JSON.stringify({ resolution: "approved_in_demo" }) })).json() as { state: CareState; external_side_effect: boolean };
+    expect(resolved.external_side_effect).toBe(false);
+    expect(resolved.state.handoffs[0].status).toBe("approved_in_demo");
+    expect(resolved.state.events.some((event) => event.event_type === "care_team_review_decided")).toBe(true);
+  });
+
+  it("rejects care-team review before the signed monitoring threshold is present", async () => {
+    await state(runA);
+    const currentSnapshot = await snapshot(runA);
+    const response = await call(runA, "/api/care/handoffs", { method: "POST", body: JSON.stringify({ resident_id: "rose-demo", review_type: "nurse_review", period_hours: 72, reason: "Attempt review before the signed monitoring threshold is present.", evidence_snapshot_id: currentSnapshot.evidence_snapshot_id, idempotency_key: "premature-review-001" }) });
+    expect(response.status).toBe(409);
   });
 
   it("rejects unsafe channels and oversized bodies", async () => {
