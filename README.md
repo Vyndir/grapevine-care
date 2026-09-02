@@ -51,8 +51,11 @@ diagnose, determine that an emergency exists, or contact emergency services.
 
 ## Judge demo
 
-1. Open the deployed site in ChatGPT’s in-app browser and allow site tools.
-2. In the **Judge demo** bar, select **72-hour story** and open **Caregiver**.
+1. Open the deployed site in ChatGPT’s in-app browser and allow site tools. A
+   new demo run opens directly in the **Caregiver cockpit** with the completed
+   **72-hour story** selected.
+2. Use **Rose’s view** later to demonstrate the intentionally simpler,
+   large-touch resident station.
 3. Ask ChatGPT:
 
    > How has Rose been doing over the last 72 hours? Use this page's tools to

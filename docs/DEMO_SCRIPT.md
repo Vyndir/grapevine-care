@@ -2,7 +2,8 @@
 
 ## 0:00–0:12 — WebMCP immediately
 
-Begin with **72-hour story** active in the Caregiver workspace. Ask:
+The application opens with **72-hour story** active in the **Caregiver
+cockpit**. Ask:
 
 > How has Rose been doing over the last 72 hours? Compare her story with her
 > signed monitoring plan and personal baseline. Explain what is known and still
@@ -10,6 +11,8 @@ Begin with **72-hour story** active in the Caregiver workspace. Ask:
 > care-team review. Do not diagnose or claim anything was sent.
 
 Show `get_resident_context` and `get_care_story` within the first seconds.
+Later, use **Rose’s view** to show that the resident surface is intentionally
+calm and simple while the caregiver surface carries operational context.
 
 ## 0:12–0:37 — Rose is a person, not an alert
 

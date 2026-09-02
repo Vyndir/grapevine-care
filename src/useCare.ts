@@ -3,12 +3,12 @@ import type { CareEvent, CareState, CareTeamHandoff, PreparedAction, ResidentChe
 
 const demoRunStorageKey = "grapevine-care-demo-run";
 
-function getOrCreateDemoRunId() {
+function getOrCreateDemoRun() {
   const existing = sessionStorage.getItem(demoRunStorageKey);
-  if (existing) return existing;
+  if (existing) return { id: existing, isNew: false };
   const created = `run_${crypto.randomUUID().replaceAll("-", "")}`;
   sessionStorage.setItem(demoRunStorageKey, created);
-  return created;
+  return { id: created, isNew: true };
 }
 
 async function api<T>(path: string, demoRunId: string, init?: RequestInit): Promise<T> {
@@ -41,7 +41,7 @@ export function useCare() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const stateRef = useRef<CareState | null>(null);
-  const demoRunIdRef = useRef(getOrCreateDemoRunId());
+  const demoRunRef = useRef(getOrCreateDemoRun());
 
   const commit = useCallback((next: CareState) => {
     stateRef.current = next;
@@ -50,15 +50,23 @@ export function useCare() {
     return next;
   }, []);
 
-  const getState = useCallback(() => api<CareState>("/api/care/state?resident_id=rose-demo", demoRunIdRef.current), []);
+  const getState = useCallback(() => api<CareState>("/api/care/state?resident_id=rose-demo", demoRunRef.current.id), []);
   const refresh = useCallback(async () => commit(await getState()), [commit, getState]);
 
-  useEffect(() => { void refresh().catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not load care workspace.")); }, [refresh]);
+  useEffect(() => {
+    const initialize = async () => {
+      if (!demoRunRef.current.isNew) return refresh();
+      demoRunRef.current.isNew = false;
+      const result = await api<{ state: CareState }>("/api/care/scenario", demoRunRef.current.id, { method: "POST", body: JSON.stringify({ scenario: "care_story" }) });
+      return commit(result.state);
+    };
+    void initialize().catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not load care workspace."));
+  }, [commit, refresh]);
 
   const setScenario = useCallback(async (scenario: Scenario) => {
     setBusy(true);
     try {
-      const result = await api<{ state: CareState }>("/api/care/scenario", demoRunIdRef.current, { method: "POST", body: JSON.stringify({ scenario }) });
+      const result = await api<{ state: CareState }>("/api/care/scenario", demoRunRef.current.id, { method: "POST", body: JSON.stringify({ scenario }) });
       return commit(result.state);
     } finally { setBusy(false); }
   }, [commit]);
@@ -66,16 +74,16 @@ export function useCare() {
   const confirmDose = useCallback(async (doseId: string) => {
     setBusy(true);
     try {
-      const result = await api<{ state: CareState }>(`/api/care/doses/${encodeURIComponent(doseId)}/confirm`, demoRunIdRef.current, { method: "POST", body: "{}" });
+      const result = await api<{ state: CareState }>(`/api/care/doses/${encodeURIComponent(doseId)}/confirm`, demoRunRef.current.id, { method: "POST", body: "{}" });
       return commit(result.state);
     } finally { setBusy(false); }
   }, [commit]);
 
   const getEvidenceSnapshot = useCallback((input: { resident_id: string; event_limit?: number; }) =>
-    api<Awaited<ReturnType<CareActions["getEvidenceSnapshot"]>>>("/api/care/evidence-snapshot", demoRunIdRef.current, { method: "POST", body: JSON.stringify(input) }), []);
+    api<Awaited<ReturnType<CareActions["getEvidenceSnapshot"]>>>("/api/care/evidence-snapshot", demoRunRef.current.id, { method: "POST", body: JSON.stringify(input) }), []);
 
   const prepareResidentCheckIn = useCallback(async (input: { resident_id: string; prompt: string; evidence_snapshot_id: string; idempotency_key: string; }) => {
-    const result = await api<Awaited<ReturnType<CareActions["prepareResidentCheckIn"]>>>("/api/care/resident-check-ins", demoRunIdRef.current, { method: "POST", body: JSON.stringify(input) });
+    const result = await api<Awaited<ReturnType<CareActions["prepareResidentCheckIn"]>>>("/api/care/resident-check-ins", demoRunRef.current.id, { method: "POST", body: JSON.stringify(input) });
     await refresh();
     return result;
   }, [refresh]);
@@ -83,25 +91,25 @@ export function useCare() {
   const respondResidentCheckIn = useCallback(async (checkInId: string, responseCode: ResidentResponseCode) => {
     setBusy(true);
     try {
-      const result = await api<{ state: CareState }>(`/api/care/resident-check-ins/${encodeURIComponent(checkInId)}/respond`, demoRunIdRef.current, { method: "POST", body: JSON.stringify({ response_code: responseCode }) });
+      const result = await api<{ state: CareState }>(`/api/care/resident-check-ins/${encodeURIComponent(checkInId)}/respond`, demoRunRef.current.id, { method: "POST", body: JSON.stringify({ response_code: responseCode }) });
       return commit(result.state);
     } finally { setBusy(false); }
   }, [commit]);
 
   const prepareAction = useCallback(async (input: { resident_id: string; channel: PreparedAction["channel"]; reason: string; evidence_snapshot_id: string; idempotency_key: string; }) => {
-    const result = await api<{ action: PreparedAction; approval_required: true; external_side_effect: false; }>("/api/care/actions", demoRunIdRef.current, { method: "POST", body: JSON.stringify(input) });
+    const result = await api<{ action: PreparedAction; approval_required: true; external_side_effect: false; }>("/api/care/actions", demoRunRef.current.id, { method: "POST", body: JSON.stringify(input) });
     await refresh();
     return result;
   }, [refresh]);
 
   const requestDeviceHealthSnapshot = useCallback(async (input: { resident_id: string; device_id: string; idempotency_key: string; }) => {
-    const result = await api<Awaited<ReturnType<CareActions["requestDeviceHealthSnapshot"]>>>("/api/care/device-health-snapshots", demoRunIdRef.current, { method: "POST", body: JSON.stringify(input) });
+    const result = await api<Awaited<ReturnType<CareActions["requestDeviceHealthSnapshot"]>>>("/api/care/device-health-snapshots", demoRunRef.current.id, { method: "POST", body: JSON.stringify(input) });
     await refresh();
     return result;
   }, [refresh]);
 
   const prepareCareTeamReview = useCallback(async (input: { resident_id: string; review_type: CareTeamHandoff["review_type"]; period_hours: 24 | 72; reason: string; evidence_snapshot_id: string; idempotency_key: string; }) => {
-    const result = await api<Awaited<ReturnType<CareActions["prepareCareTeamReview"]>>>("/api/care/handoffs", demoRunIdRef.current, { method: "POST", body: JSON.stringify(input) });
+    const result = await api<Awaited<ReturnType<CareActions["prepareCareTeamReview"]>>>("/api/care/handoffs", demoRunRef.current.id, { method: "POST", body: JSON.stringify(input) });
     await refresh();
     return result;
   }, [refresh]);
@@ -109,7 +117,7 @@ export function useCare() {
   const resolveAction = useCallback(async (actionId: string, resolution: "approved_in_demo" | "dismissed") => {
     setBusy(true);
     try {
-      const result = await api<{ state: CareState }>(`/api/care/actions/${encodeURIComponent(actionId)}/resolve`, demoRunIdRef.current, { method: "POST", body: JSON.stringify({ resolution }) });
+      const result = await api<{ state: CareState }>(`/api/care/actions/${encodeURIComponent(actionId)}/resolve`, demoRunRef.current.id, { method: "POST", body: JSON.stringify({ resolution }) });
       return commit(result.state);
     } finally { setBusy(false); }
   }, [commit]);
@@ -117,7 +125,7 @@ export function useCare() {
   const resolveCareTeamReview = useCallback(async (handoffId: string, resolution: "approved_in_demo" | "dismissed") => {
     setBusy(true);
     try {
-      const result = await api<{ state: CareState }>(`/api/care/handoffs/${encodeURIComponent(handoffId)}/resolve`, demoRunIdRef.current, { method: "POST", body: JSON.stringify({ resolution }) });
+      const result = await api<{ state: CareState }>(`/api/care/handoffs/${encodeURIComponent(handoffId)}/resolve`, demoRunRef.current.id, { method: "POST", body: JSON.stringify({ resolution }) });
       return commit(result.state);
     } finally { setBusy(false); }
   }, [commit]);

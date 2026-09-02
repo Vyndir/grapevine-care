@@ -46,6 +46,7 @@ function installFetch() {
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
     if (url.startsWith("/api/care/state")) return Response.json(state);
     if (url === "/api/care/scenario") {
+      if (body.scenario === "on_schedule") state = structuredClone(baseState);
       if (body.scenario === "missed_window") state = { ...state, evidence_version: 1, resident: { ...state.resident, scenario: "missed_window", severity: "attention" }, doses: state.doses.map((dose, index) => index === 0 ? { ...dose, status: "missed" } : dose), resident_check_ins: [], actions: [], events: [{ ...state.events[0], id: "evt-missed", severity: "attention", summary: "Medication window elapsed" }, ...state.events] };
       if (body.scenario === "care_story") state = { ...state, evidence_version: 1, resident: { ...state.resident, scenario: "care_story", severity: "attention", simulated_time: "2026-09-02T09:42:00-04:00" }, doses: state.doses.map((dose, index) => index === 0 ? { ...dose, status: "missed" } : dose), resident_check_ins: [{ id: "story-check-in", resident_id: "rose-demo", prompt: "Are you okay?", status: "responded", response_code: "im_okay", evidence_snapshot_id: "historical-story-snapshot", idempotency_key: "historical-story-check-in", created_at: "2026-09-01T09:12:00-04:00", responded_at: "2026-09-01T09:14:00-04:00" }], actions: [], handoffs: [], care_story: { ...state.care_story, horizon_hours: 72, starts_at: "2026-08-31T07:00:00-04:00", ends_at: "2026-09-02T09:42:00-04:00", routine_confirmations: 3, unconfirmed_windows: 2, resident_check_ins: 1, routine_activity_signals: 2, summary: "Rose’s routine was largely consistent across three days. Two care-plan signals now require human review.", unresolved: ["Whether either unconfirmed window reflects medication ingestion"], baseline_comparisons: [{ signal: "Morning activity", baseline: "Usually begins by 7:30 AM", observed: "First movement at 9:31 AM", interpretation: "Person-specific change; cause unknown", evidence_status: "changed" }] }, events: [{ ...state.events[0], id: "story-current", event_type: "medication_window_unconfirmed", severity: "attention", summary: "Second monitoring-plan signal in 72 hours", detail: "A second morning medication window lacks confirmation." }, ...state.events] };
       return Response.json({ state });
@@ -82,9 +83,14 @@ function installFetch() {
 beforeEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); installFetch(); });
 
 describe("Grapevine Care", () => {
-  it("presents a large-touch resident flow and registers only current capabilities", async () => {
+  it("opens with the caregiver story and keeps Rose's large-touch view one click away", async () => {
     const tools = installModelContext();
     render(<App />);
+    expect(await screen.findByRole("heading", { name: "How Rose has been doing, relative to Rose" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Caregiver cockpit" })).toHaveClass("active");
+    await waitFor(() => expect(tools.has("prepare_care_team_review")).toBe(true));
+    fireEvent.click(screen.getByRole("button", { name: "Reset demo" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Rose’s view" }));
     expect(await screen.findByRole("heading", { name: "Good morning, Rose." })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Verify locally/i })).toBeEnabled();
     await waitFor(() => expect(tools.size).toBe(7));
@@ -95,9 +101,8 @@ describe("Grapevine Care", () => {
 
   it("shows explicit uncertainty after the missed-window scenario", async () => {
     render(<App />);
-    await screen.findByText("Good morning, Rose.");
+    await screen.findByText("How Rose has been doing, relative to Rose");
     fireEvent.click(screen.getByRole("button", { name: "Missed window" }));
-    fireEvent.click(screen.getByRole("button", { name: "Caregiver" }));
     expect(await screen.findByRole("heading", { name: "Rose’s care routine needs attention" })).toBeInTheDocument();
     expect(screen.getByText(/without assuming ingestion/i)).toBeInTheDocument();
   });
@@ -105,21 +110,25 @@ describe("Grapevine Care", () => {
   it("lets the agent prepare a bounded question that only Rose can answer", async () => {
     const tools = installModelContext();
     render(<App />);
-    await screen.findByText("Good morning, Rose.");
+    await screen.findByText("How Rose has been doing, relative to Rose");
     fireEvent.click(screen.getByRole("button", { name: "Missed window" }));
     await waitFor(() => expect(tools.has("prepare_resident_check_in")).toBe(true));
     const evidence = await tools.get("get_care_evidence")!.execute({ resident_id: "rose-demo" }) as { evidence_snapshot_id: string };
     await act(async () => { await tools.get("prepare_resident_check_in")!.execute({ resident_id: "rose-demo", prompt: "Your care circle wants to check in. Are you okay?", evidence_snapshot_id: evidence.evidence_snapshot_id, idempotency_key: "resident-check-001" }); });
+    fireEvent.click(screen.getByRole("button", { name: "Rose’s view" }));
     expect(await screen.findByRole("heading", { name: "Your care circle wants to check in. Are you okay?" })).toBeInTheDocument();
     expect(tools.has("prepare_resident_check_in")).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "I'm okay" }));
     expect(await screen.findByText("Thank you, Rose.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reset demo" }));
     await waitFor(() => expect(tools.has("prepare_caregiver_check_in")).toBe(true));
   });
 
   it("stages agent outreach and stops at human review", async () => {
     const tools = installModelContext();
     render(<App />);
+    await screen.findByText("How Rose has been doing, relative to Rose");
+    fireEvent.click(screen.getByRole("button", { name: "Reset demo" }));
     await waitFor(() => expect(tools.has("prepare_caregiver_check_in")).toBe(true));
     const evidence = await tools.get("get_care_evidence")!.execute({ resident_id: "rose-demo" }) as { evidence_snapshot_id: string };
     await act(async () => { await tools.get("prepare_caregiver_check_in")!.execute({ resident_id: "rose-demo", channel: "call", reason: "The current evidence needs caregiver review.", evidence_snapshot_id: evidence.evidence_snapshot_id, idempotency_key: "test-action-001" }); });
@@ -130,9 +139,7 @@ describe("Grapevine Care", () => {
   it("turns a compressed 72-hour episode into baseline-aware WebMCP context and a human-gated nurse review", async () => {
     const tools = installModelContext();
     render(<App />);
-    await screen.findByText("Good morning, Rose.");
-    fireEvent.click(screen.getByRole("button", { name: "72-hour story" }));
-    fireEvent.click(screen.getByRole("button", { name: "Caregiver" }));
+    await screen.findByText("How Rose has been doing, relative to Rose");
     expect(await screen.findByRole("heading", { name: "How Rose has been doing, relative to Rose" })).toBeInTheDocument();
     expect(screen.getByText(/Two care-plan signals now require human review/i)).toBeInTheDocument();
     await waitFor(() => expect(tools.has("get_resident_context") && tools.has("get_care_story") && tools.has("prepare_care_team_review")).toBe(true));
@@ -149,7 +156,7 @@ describe("Grapevine Care", () => {
 
   it("makes device capability boundaries visible", async () => {
     render(<App />);
-    await screen.findByText("Good morning, Rose.");
+    await screen.findByText("How Rose has been doing, relative to Rose");
     fireEvent.click(screen.getByRole("button", { name: "Devices & MCP" }));
     expect(screen.getByRole("heading", { name: "A safe control plane for connected care" })).toBeInTheDocument();
     expect(screen.getByText("compartment.release.local_only")).toBeInTheDocument();
