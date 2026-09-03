@@ -55,6 +55,12 @@ function installModelContext() {
   return tools;
 }
 
+function installSynchronousModelContext() {
+  const tools = new Map<string, RegisteredTool>();
+  Object.defineProperty(document, "modelContext", { configurable: true, value: { registerTool(tool: RegisteredTool, options: { signal?: AbortSignal } = {}) { tools.set(tool.name, tool); options.signal?.addEventListener("abort", () => { if (tools.get(tool.name) === tool) tools.delete(tool.name); }); } } });
+  return tools;
+}
+
 function installFetch() {
   let state = structuredClone(baseState);
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -164,6 +170,20 @@ describe("Grapevine Care", () => {
     expect(screen.queryByRole("button", { name: "Rose’s station" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Demo scenario" })).not.toBeInTheDocument();
     await waitFor(() => expect(tools.has("prepare_team_inquiry")).toBe(true));
+  });
+
+  it("supports browsers whose WebMCP registerTool returns synchronously", async () => {
+    const tools = installSynchronousModelContext();
+    render(<App />);
+    expect((await screen.findAllByText("9:15 AM")).length).toBeGreaterThan(0);
+    await waitFor(() => expect(tools.size).toBe(4));
+    expect([...tools.keys()].sort()).toEqual([
+      "get_care_team_overview",
+      "get_resident_context",
+      "get_shift_context",
+      "prepare_team_inquiry"
+    ]);
+    expect(screen.getByText("4 agent tools active")).toBeInTheDocument();
   });
 
   it("blocks simulated time until the current decision is accounted for", async () => {

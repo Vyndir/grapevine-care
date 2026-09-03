@@ -19,9 +19,11 @@ Medical and emergency decisions: outside the product
 
 ## Multi-resident care-team layer
 
-Migrations `0006_care_team_day.sql` and `0007_inquiry_driven_day.sql` add a
-six-block persisted simulation, idempotent orientation packets, and explicit
-team inquiries. They model exactly three distinct operational problems: Evelyn’s
+Migrations `0006_care_team_day.sql` through
+`0011_handoff_confirmation_inquiries.sql` add a six-block persisted simulation,
+idempotent orientation packets, and explicit team inquiries for verification,
+readiness, visit evidence, outgoing approval, and recipient receipt. They model
+exactly three distinct operational problems: Evelyn’s
 missing visit-verification evidence, Walter’s resident-specific onboarding gap,
 and Rose’s later coverage disruption.
 
@@ -177,7 +179,10 @@ prompt-only instruction.
 ## Tool lifecycle
 
 Each tool is registered with an `AbortController`, bounded JSON Schema, and
-annotations. Four non-consequential caregiver-context tools remain available
+annotations. Registration accepts both the synchronous `void` behavior used by
+some WebMCP browsers and Promise-returning implementations; synchronous throws
+and asynchronous rejections are surfaced without crashing the React tree. Four
+non-consequential caregiver-context tools remain available
 throughout the call-out workflow so natural questions do not fall back to DOM
 inspection. The page aborts and replaces consequential registrations when the
 workflow changes. All device-derived outputs use `untrustedContentHint: true`.

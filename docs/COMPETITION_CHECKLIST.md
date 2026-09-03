@@ -1,6 +1,7 @@
 # OpenAI WebMCP Challenge checklist
 
-Verified against the official challenge and Devpost rules on August 31, 2026.
+Verified against the live Devpost challenge requirements and judging criteria on
+September 3, 2026.
 
 ## Implemented
 
@@ -15,6 +16,7 @@ Verified against the official challenge and Devpost rules on August 31, 2026.
 - [x] Resident evidence-resolution loop with human-only response controls
 - [x] Evidence-snapshot binding and stale-state rejection
 - [x] State-dependent WebMCP capability registration
+- [x] Synchronous and Promise-returning `registerTool` browser compatibility with regression coverage
 - [x] Natural-language workflow bootstrap with optional shift ID
 - [x] Persistent safe caregiver-context reads with state-dependent actions
 - [x] Visible active-tool diagnostic on the primary caregiver workspace
@@ -53,7 +55,7 @@ Verified against the official challenge and Devpost rules on August 31, 2026.
 - [x] Confirm the joint MIT license is visible at the repository root/about area
 - [ ] Record and publicly upload the demo video to YouTube with audio
 - [ ] Add live URL, repository URL, video URL, screenshots, and team members to Devpost
-- [ ] Run the judge prompt in ChatGPT’s in-app browser on the deployed URL
+- [ ] Run the complete cold-start judge protocol on the final deployed build
 - [x] Set the Sites deployment to judge-accessible public access
 - [ ] Submit before September 3, 2026 at 1:00 p.m. PT
 

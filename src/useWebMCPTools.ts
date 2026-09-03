@@ -38,9 +38,14 @@ function useWebMCPTool(tool: WebMCPTool | null): Registration {
     if (!modelContext || !tool) { setState({ supported: Boolean(modelContext), registered: false, error: null }); return; }
     const controller = new AbortController();
     setState({ supported: true, registered: false, error: null });
-    void modelContext.registerTool(tool, { signal: controller.signal })
-      .then(() => { if (!controller.signal.aborted) setState({ supported: true, registered: true, error: null }); })
-      .catch((caught: unknown) => { if (!controller.signal.aborted) setState({ supported: true, registered: false, error: caught instanceof Error ? caught : new Error("WebMCP tool registration failed.") }); });
+    try {
+      const registration = modelContext.registerTool(tool, { signal: controller.signal });
+      void Promise.resolve(registration)
+        .then(() => { if (!controller.signal.aborted) setState({ supported: true, registered: true, error: null }); })
+        .catch((caught: unknown) => { if (!controller.signal.aborted) setState({ supported: true, registered: false, error: caught instanceof Error ? caught : new Error("WebMCP tool registration failed.") }); });
+    } catch (caught: unknown) {
+      if (!controller.signal.aborted) setState({ supported: true, registered: false, error: caught instanceof Error ? caught : new Error("WebMCP tool registration failed.") });
+    }
     return () => controller.abort();
   }, [tool]);
   return state;

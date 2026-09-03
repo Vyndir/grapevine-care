@@ -119,9 +119,10 @@ See the [timed demo script](docs/DEMO_SCRIPT.md), [judge guide](docs/JUDGE_GUIDE
 - Zod schemas converted to WebMCP JSON Schema inputs
 - Vitest, Testing Library, and Node SQLite test harness
 
-Eight migrations separate base care state, browser-run isolation, evidence
+Eleven migrations separate base care state, browser-run isolation, evidence
 resolution, longitudinal context, caregiver continuity, the multi-resident day,
-inquiry-driven time gating, and Walter's readiness follow-up verification. See
+inquiry-driven time gating, Walter's readiness verification, Jordan's readiness
+and visit evidence, and the two-sided handoff confirmation loop. See
 [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Local setup and verification

@@ -36,7 +36,7 @@ declare global {
       registerTool(
         tool: WebMCPTool,
         options?: WebMCPRegisterToolOptions
-      ): Promise<void>;
+      ): void | Promise<void>;
     };
   }
 

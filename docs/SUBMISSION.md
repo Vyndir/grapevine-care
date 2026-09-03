@@ -18,16 +18,23 @@ continuity loop without transferring workforce or clinical authority to AI.
 
 ## What it does
 
-The default fictional demo begins when Maya calls out for Rose's 5:00 PM visit.
-WebMCP lets an agent inspect the versioned shift, evaluate four caregivers
-against eight explicit constraints, explain exclusions and workload tradeoffs,
-and prepare the one eligible option. A scheduler—not the agent—assigns Jordan.
-Jordan receives a “Since you were last here” brief, acknowledges it, completes a
-compressed visit, and records bounded facts. The agent prepares an
-assignment-bound handoff; Jordan approves before Luis receives and acknowledges
-it. The existing resident station, 72-hour care story, signed monitoring plan,
-nurse review, and extensible device registry remain available as supporting
-surfaces.
+The default fictional demo is one compressed Care Team Day across Rose, Walter,
+and Evelyn. At 9:15 AM, the coordinator investigates Evelyn's missing visit
+verification without assuming Luis is absent. At 11:30 AM, the agent prepares
+Walter's resident-specific orientation packet; Elena reports her own completion,
+and the coordinator verifies it. At 2:15 PM, Maya calls out for Rose's evening
+visit. WebMCP evaluates four caregivers against eight explicit constraints,
+explains every exclusion, and prepares Jordan—the one eligible option—for
+scheduler review. At 5:00 PM and 7:35 PM, the coordinator requests and verifies
+Jordan's readiness and bounded visit record rather than impersonating her. At
+8:00 PM, an assignment-bound handoff is approved by Jordan, received by Luis,
+and verified by the coordinator.
+
+The simulated clock cannot advance while the current decision is unaccounted
+for. New events can enter the day, but time never silently resolves an unknown.
+The 72-hour care story, signed monitoring plan, nurse-review workflow, and
+least-privilege device registry remain implemented as supporting evidence of the
+broader architecture.
 
 ## How we built it
 
