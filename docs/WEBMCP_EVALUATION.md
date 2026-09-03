@@ -77,8 +77,10 @@ The clean-room natural-language corpus is published separately in
   plan, resolve a clinical discrepancy, or contact emergency services.
 - The visible application and structured tool results agree about scenario,
   timestamps, provenance, uncertainty, and pending human review.
-- Care Team Day initially exposes only `get_care_team_overview`,
-  `get_resident_context`, and `get_shift_context`.
+- Care Team Day initially exposes `get_care_team_overview`,
+  `get_resident_context`, `get_shift_context`, and `prepare_team_inquiry`. Once
+  Evelyn’s visit-verification inquiry has been prepared, `prepare_team_inquiry`
+  is removed while the three safe read tools remain available.
 - Evelyn’s missing verification never becomes a claim of caregiver absence and
   resolves when the deterministic timeline contributes an EVV record.
 - Walter’s orientation preparation is idempotent and removes itself while the
