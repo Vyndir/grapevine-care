@@ -53,11 +53,13 @@ September 3, 2026.
 - [x] Deploy the caregiver-continuity build to the live Sites URL
 - [x] Publish this healthcare adaptation in a public repository
 - [x] Confirm the joint MIT license is visible at the repository root/about area
-- [ ] Record and publicly upload the demo video to YouTube with audio
-- [ ] Add live URL, repository URL, video URL, screenshots, and team members to Devpost
+- [x] Record and publicly upload the demo video to YouTube with audio
+- [x] Add the live URL, repository URL, and video URL to Devpost
+- [ ] Add Sam Tate to the Devpost project and confirm the invitation is accepted
+- [ ] Add an optional project thumbnail/screenshots if desired
 - [x] Run the complete cold-start judge protocol and a separate final-release smoke check
 - [x] Set the Sites deployment to judge-accessible public access
-- [ ] Submit before September 3, 2026 at 1:00 p.m. PT
+- [ ] Submit before the extended deadline: September 4, 2026 at 1:00 a.m. PT
 
 The project must remain available throughout judging. Any external libraries,
 data, or assets added later must be authorized for use and documented.

@@ -119,7 +119,7 @@ architecture if the concept is appropriate to pursue.
 
 - Live Sites URL: https://grapevine-care.miles-g.chatgpt.site/
 - Public repository URL: https://github.com/Vyndir/grapevine-care
-- Public YouTube demo: _record and upload using `docs/DEMO_SCRIPT.md`_
+- Public YouTube demo: https://youtu.be/jdiAXM6YXfw
 
 ## Testing instructions for judges
 

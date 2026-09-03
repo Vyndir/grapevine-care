@@ -144,9 +144,10 @@ https://github.com/Vyndir/grapevine-care
 
 ## Demo Video
 
-TODO — record and upload a public YouTube video under three minutes, with audio,
-using `docs/DEMO_SCRIPT.md`. Per the user's instruction, recording begins only
-after the final cold-start production verification.
+https://youtu.be/jdiAXM6YXfw
+
+The public YouTube demo includes audio and demonstrates the live application and
+its WebMCP tools.
 
 ## Screenshot Shot List
 
@@ -161,7 +162,7 @@ after the final cold-start production verification.
 ## Submission Readiness Notes
 
 - Official event: The WebMCP Challenge (`webmcp`)
-- Official deadline: September 3, 2026 at 1:00 PM Pacific / 4:00 PM Eastern
+- Extended deadline: September 4, 2026 at 1:00 AM Pacific / 4:00 AM Eastern
 - Submitter type: **Team of Individuals** (Miles Greer and Sam Tate)
 - App status: **New**; Grapevine Care was created August 31, 2026 during the
   submission period from a documented MIT-licensed foundation.
@@ -186,15 +187,16 @@ device, or emergency-service integration. Device and human responses are
 fictional. It provides no diagnosis, medical advice, treatment decision, or
 proof of medication ingestion.
 
-## TODO Official Form Fields
+## Official Form Status
 
-- **Demo video URL:** pending recording and public YouTube upload.
-- **Countries of residence for every team member:** confirm before submission;
-  do not infer.
-- **Devpost project/team:** create the separate Grapevine Care Devpost project,
-  then add Sam Tate with the project invite link before submission.
-- **Screenshots/thumbnail:** capture from the final public build after cold-start
-  verification.
-- **Codex session ID:** add if the final Devpost form requests one.
-- **Final submission:** intentionally not performed; requires the user's explicit
-  approval after video and asset review.
+- **Devpost project:** created as a draft at
+  https://devpost.com/software/grapevine-care.
+- **Demo video URL:** saved as https://youtu.be/jdiAXM6YXfw.
+- **Countries of residence:** United States is saved for both team members.
+- **Team membership:** Sam Tate still needs to join the project and confirm the
+  invitation before final submission.
+- **Screenshots/thumbnail:** optional project media remains available to add if
+  desired.
+- **Codex session ID:** add only if the final Devpost form requests one.
+- **Final submission:** intentionally not performed; it requires the user's
+  explicit approval after the remaining eligibility and team checks.
