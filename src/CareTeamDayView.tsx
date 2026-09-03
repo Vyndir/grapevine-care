@@ -126,7 +126,7 @@ export function CareTeamDayView({ state, actions, busy, webmcp, onMessage }: { s
 
   return <main className="team-day-layout">
     <section className="day-clock-hero">
-      <div className="day-clock"><small>Wednesday · simulated care-team day</small><strong>{formatClock(state.resident.simulated_time)}</strong><span>{day.step_label}</span></div>
+      <div className="day-clock" aria-live="polite" aria-label={`Current simulated time ${formatClock(state.resident.simulated_time)}, ${day.step_label}`}><small>Wednesday · simulated care-team day</small><strong>{formatClock(state.resident.simulated_time)}</strong><span>{day.step_label}</span></div>
       <div className="day-progress"><div><span>Shift progress</span><strong>{resolvedCount} decisions addressed</strong></div><div className="progress-track"><i style={{ width: `${progress}%` }} /></div><ol>{day.timeline.map((item) => <li key={item.step} className={item.step < day.step ? "complete" : item.step === day.step ? "current" : "future"}><b>{item.time}</b><span>{item.label}</span></li>)}</ol></div>
       <details className="agent-tool-status"><summary><RadioIcon weight="fill" /> {webmcp.registered ? `${webmcp.count} agent tools active` : "Agent tools"}</summary><div><strong>Tools available for this decision</strong><ul>{webmcp.availableNames.map((name) => <li key={name}><code>{name}</code></li>)}</ul><p>The set changes as the day advances. Human acknowledgements remain human-only.</p></div></details>
     </section>
