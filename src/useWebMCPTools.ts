@@ -223,7 +223,7 @@ export function useWebMCPTools(actions: CareActions, state: CareState | null, wo
     } satisfies WebMCPTool,
     coverageCandidates: {
       name: "get_coverage_candidates", title: "Get coverage candidates",
-      description: "Evaluate caregivers against explicit availability, qualification, training, Rose orientation, care-plan acknowledgement, conflicts, travel time, and weekly-hour constraints. Returns no opaque score and never changes the schedule.",
+      description: "Answer natural coverage questions such as who can cover, why someone is excluded, who knows the resident, or what tradeoffs remain. Omit shift_id to resolve the single active uncovered shift; ambiguous contexts request clarification. Uses explicit availability, qualification, training, resident orientation, care-plan acknowledgement, conflicts, travel, and weekly-hour rules. Returns no opaque score and never changes the schedule.",
       inputSchema: toolInputSchemas.getCoverageCandidates, annotations: { ...baseAnnotations, readOnlyHint: true },
       async execute(args: unknown) { return actions.getCoverageCandidates(parseArgs(getCoverageCandidatesArgsSchema, args)); }
     } satisfies WebMCPTool,

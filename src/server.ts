@@ -688,10 +688,15 @@ async function getCoverageCandidates(db: D1Database, runId: string, body: Record
   const parsed = getCoverageCandidatesArgsSchema.safeParse(body);
   if (!parsed.success) return json({ error: "Invalid coverage-candidate request." }, 400);
   const state = await loadCareState(db, runId);
-  const shift = state?.shifts.find((item) => item.id === parsed.data.shift_id);
-  if (!state || !shift) return json({ error: "Shift not found." }, 404);
+  if (!state) return json({ error: "Care state not found." }, 404);
+  const uncovered = state.shifts.filter((item) => item.coverage_status === "coverage_needed");
+  if (!parsed.data.shift_id && uncovered.length === 0) return json({ error: "No shift currently needs coverage." }, 409);
+  if (!parsed.data.shift_id && uncovered.length > 1) return json({ error: "More than one shift needs coverage. Choose the intended shift before comparing candidates.", clarification_required: true, matching_shifts: uncovered.map(({ id, resident_id, starts_at, ends_at }) => ({ id, resident_id, starts_at, ends_at })) }, 409);
+  const shift = parsed.data.shift_id ? state.shifts.find((item) => item.id === parsed.data.shift_id) : uncovered[0];
+  if (!shift) return json({ error: "Shift not found." }, 404);
   if (shift.coverage_status !== "coverage_needed") return json({ error: "Coverage candidates are available only while this shift needs coverage." }, 409);
-  return json({ fictional: true, shift_id: shift.id, candidates: coverageCandidates(state, shift.id), method: "Deterministic constraint evaluation; no demographic ranking or opaque score.", strongest_eligible_candidate_id: coverageCandidates(state, shift.id).find((candidate) => candidate.eligible)?.caregiver.id ?? null });
+  const candidates = coverageCandidates(state, shift.id);
+  return json({ fictional: true, shift_id: shift.id, resident_id: shift.resident_id, resolved_from: parsed.data.shift_id ? "explicit_shift_id" : "single_active_coverage_need", candidates, method: "Deterministic constraint evaluation; no demographic ranking or opaque score.", strongest_eligible_candidate_id: candidates.find((candidate) => candidate.eligible)?.caregiver.id ?? null });
 }
 
 async function prepareShiftCoverage(db: D1Database, runId: string, body: Record<string, unknown>) {

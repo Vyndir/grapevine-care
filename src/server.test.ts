@@ -235,8 +235,9 @@ describe("Grapevine Care server invariants", () => {
     const context = await contextResponse.json() as { shift: { id: string }; resident_id?: string; schedule_snapshot_id: string; resolved_from: string };
     expect(context.shift.id).toBe("shift-wed-pm");
     expect(context.resolved_from).toBe("active_disrupted_shift");
-    const candidateResponse = await call(runA, "/api/care/coverage-candidates", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm" }) });
-    const candidateResult = await candidateResponse.json() as { candidates: Array<{ caregiver: { id: string }; eligible: boolean; checks: unknown[] }> };
+    const candidateResponse = await call(runA, "/api/care/coverage-candidates", { method: "POST", body: "{}" });
+    const candidateResult = await candidateResponse.json() as { shift_id: string; resolved_from: string; candidates: Array<{ caregiver: { id: string }; eligible: boolean; checks: unknown[] }> };
+    expect(candidateResult).toMatchObject({ shift_id: "shift-wed-pm", resolved_from: "single_active_coverage_need" });
     expect(candidateResult.candidates.filter((candidate) => candidate.eligible).map((candidate) => candidate.caregiver.id)).toEqual(["caregiver-jordan"]);
     expect(candidateResult.candidates.every((candidate) => candidate.checks.length === 8)).toBe(true);
     const prepared = await (await call(runA, "/api/care/coverage-proposals", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm", caregiver_id: "caregiver-jordan", schedule_snapshot_id: context.schedule_snapshot_id, reason: "Jordan passes every explicit eligibility constraint and stays within her stated weekly availability.", idempotency_key: "coverage-loop-001" }) })).json() as { proposal: { id: string }; schedule_changed: boolean };

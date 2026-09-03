@@ -60,7 +60,9 @@ Ask:
 ### 2:15 PM — Rose coverage recovery
 
 1. Advance time. Maya's call-out enters the day as the next decision.
-2. Ask the agent to evaluate all candidates and prepare the eligible option.
+2. Ask the agent “Who can cover Rose, and why not Elena or Luis?” The agent may
+   call `get_coverage_candidates({})`; the server resolves the single active
+   uncovered shift without making the judge supply an internal ID.
 3. Confirm the server reports the same named constraints for every candidate and
    no opaque suitability score.
 4. The scheduler—not the agent—approves Jordan.

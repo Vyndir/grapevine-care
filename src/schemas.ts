@@ -78,7 +78,9 @@ export const prepareTeamInquiryArgsSchema = z.object({
   prompt: z.string().check(z.trim(), z.minLength(12), z.maxLength(240), z.describe("A bounded operational question for the assigned caregiver. Do not assume absence or make a clinical inference.")),
   idempotency_key: z.string().check(z.trim(), z.minLength(8), z.maxLength(80))
 });
-export const getCoverageCandidatesArgsSchema = z.object({ shift_id: shiftIdSchema });
+export const getCoverageCandidatesArgsSchema = z.object({
+  shift_id: z.optional(shiftIdSchema.check(z.describe("Optional explicit shift. Omit to resolve the single active shift that needs coverage; the tool never guesses when multiple shifts qualify.")))
+});
 export const prepareShiftCoverageArgsSchema = z.object({
   shift_id: shiftIdSchema,
   caregiver_id: caregiverIdSchema,

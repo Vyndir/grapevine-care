@@ -43,7 +43,7 @@ export type CareActions = {
   prepareAssignmentOrientation(input: { resident_ref: string; caregiver_id: string; reason: string; idempotency_key: string; }): Promise<{ packet: OrientationPacket; coordinator_follow_up_required: boolean; external_side_effect: false; }>;
   sendAssignmentOrientationFollowUp(packetId: string): Promise<CareState>;
   verifyAssignmentOrientation(packetId: string): Promise<CareState>;
-  getCoverageCandidates(input: { shift_id: string; }): Promise<{ fictional: true; shift_id: string; candidates: CoverageCandidate[]; method: string; }>;
+  getCoverageCandidates(input?: { shift_id?: string; }): Promise<{ fictional: true; shift_id: string; resident_id: string; resolved_from: "explicit_shift_id" | "single_active_coverage_need"; candidates: CoverageCandidate[]; method: string; }>;
   prepareShiftCoverage(input: { shift_id: string; caregiver_id: string; schedule_snapshot_id: string; reason: string; idempotency_key: string; }): Promise<{ proposal: CoverageProposal; approval_required: true; external_side_effect: false; duplicate_prevented: boolean; }>;
   resolveShiftCoverage(proposalId: string, resolution: "approved_in_demo" | "dismissed"): Promise<CareState>;
   getChangesSinceLastShift(input: { caregiver_id: string; resident_id: string; }): Promise<Record<string, unknown>>;
@@ -207,7 +207,7 @@ export function useCare() {
     } finally { setBusy(false); }
   }, [commit]);
 
-  const getCoverageCandidates = useCallback((input: { shift_id: string; }) =>
+  const getCoverageCandidates = useCallback((input: { shift_id?: string; } = {}) =>
     api<Awaited<ReturnType<CareActions["getCoverageCandidates"]>>>("/api/care/coverage-candidates", demoRunRef.current.id, { method: "POST", body: JSON.stringify(input) }), []);
 
   const prepareShiftCoverage = useCallback(async (input: { shift_id: string; caregiver_id: string; schedule_snapshot_id: string; reason: string; idempotency_key: string; }) => {

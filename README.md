@@ -56,6 +56,13 @@ The primary day begins with four capabilities:
 | `get_shift_context` | Discover the relevant shift without requiring an internal ID | Read only; returns versioned state |
 | `prepare_team_inquiry` | Stage a bounded question when verification evidence is missing | No contact until coordinator approval; no inference of absence |
 
+During Rose's call-out, `get_coverage_candidates({})` likewise resolves the one
+active uncovered shift. Natural questions such as “Who can cover Rose?”, “Why
+not Elena?”, and “What excludes Luis?” reach the same deterministic comparison.
+If more than one shift needs coverage, the tool asks the user to choose instead
+of guessing. Coverage preparation still requires the explicit shift, caregiver,
+and fresh schedule snapshot returned by earlier reads.
+
 As the day changes, the page replaces completed capabilities with only the tools
 valid for the next job: assignment orientation, coverage comparison and
 preparation, incoming-caregiver briefing, visit evidence, and handoff preparation.
