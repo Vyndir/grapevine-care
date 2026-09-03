@@ -210,7 +210,7 @@ export default function App() {
     void care.actions.setScenario(next);
   }
 
-  if (!care.state) return <main className="loading-page"><span className="brand-mark"><LeafIcon weight="fill" /></span><h1>Preparing Rose’s care workspace</h1><p>{care.error ?? "Loading the fictional demo state…"}</p>{care.error && <button type="button" onClick={() => void care.actions.refresh()}>Try again</button>}</main>;
+  if (!care.state) return <main className="loading-page"><span className="brand-mark"><LeafIcon weight="fill" /></span><h1>Preparing the Care Team Day</h1><p>{care.error ?? "Loading the fictional coordination workspace…"}</p>{care.error && <button type="button" onClick={() => void care.actions.refresh()}>Try again</button>}</main>;
   const state = care.state;
   const residentResponsePending = state.resident_check_ins.some((checkIn) => checkIn.status === "awaiting_resident");
   return <div className="care-shell"><header className="care-header"><Brand /><nav className="workspace-nav" aria-label="Choose workspace"><button className={workspace === "caregiver" ? "active" : ""} type="button" onClick={() => setWorkspace("caregiver")}><UsersThreeIcon />Care Team Day</button>{residentResponsePending && <button className={workspace === "resident" ? "active" : ""} type="button" onClick={() => setWorkspace("resident")}><HouseIcon />Resident response</button>}<button className={workspace === "system" ? "active" : ""} type="button" onClick={() => setWorkspace("system")}><GaugeIcon />How WebMCP works</button></nav>{(pending || pendingHandoff) && <button className="quiet-button" type="button" onClick={() => setWorkspace("caregiver")}><BellIcon />1 review waiting</button>}</header>

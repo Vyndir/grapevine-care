@@ -145,6 +145,14 @@ function installFetch() {
 beforeEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); window.history.replaceState({}, "", "/"); installFetch(); });
 
 describe("Grapevine Care", () => {
+  it("uses care-team language while the workspace is loading", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => undefined)));
+    render(<App />);
+    expect(screen.getByRole("heading", { name: "Preparing the Care Team Day" })).toBeInTheDocument();
+    expect(screen.getByText("Loading the fictional coordination workspace…")).toBeInTheDocument();
+    expect(screen.queryByText(/Preparing Rose/i)).not.toBeInTheDocument();
+  });
+
   it("opens directly into one time-led Care Team Day without a permanent Rose tab", async () => {
     const tools = installModelContext();
     render(<App />);
