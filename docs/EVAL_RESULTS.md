@@ -1,6 +1,6 @@
 # Grapevine Care evaluation results
 
-Last run: September 2, 2026
+Last automated run: September 3, 2026
 
 Command:
 
@@ -8,7 +8,8 @@ Command:
 pnpm run test
 ```
 
-Result: **3 test files passed, 32 tests passed, 0 failed.**
+Result: **3 test files passed, 31 tests passed, 0 failed.** TypeScript,
+public-repository audit, and production build also passed through `pnpm run verify`.
 
 ## Recorded coverage
 
@@ -27,6 +28,7 @@ Result: **3 test files passed, 32 tests passed, 0 failed.**
 | Recipient has no access before outgoing-caregiver approval | Pass | Server continuity-loop test |
 | Final acknowledgement is recorded only for the next caregiver | Pass | Server continuity-loop test |
 | Only capabilities appropriate to the current workflow register | Pass | Frontend dynamic-registration tests |
+| Synchronous `registerTool` return does not crash the page | Pass | Frontend browser-compatibility regression test |
 | Missed-window uncertainty is visible | Pass | Frontend scenario test |
 | Agent can prepare a resident card but cannot answer it | Pass | Frontend resident-loop test |
 | Rose’s response exposes caregiver preparation only after human input | Pass | Frontend resident-loop test |
@@ -56,6 +58,30 @@ Result: **3 test files passed, 32 tests passed, 0 failed.**
 | Walter orientation preparation is idempotent; outreach, response, and verification are explicit | Pass | Server and frontend WebMCP tests |
 | Rose’s coverage tools appear when the compressed day reaches her call-out | Pass | Server state-transition test |
 
+## Final production cold-start verification
+
+Sites version 20 was tested on September 3, 2026 in a fresh ChatGPT desktop
+in-app browser session with WebMCP available. The following passed:
+
+- Care Team Day rendered on first load with no reload workaround.
+- Exactly four opening tools registered: `get_care_team_overview`,
+  `get_resident_context`, `get_shift_context`, and `prepare_team_inquiry`.
+- `get_care_team_overview({})` returned the 9:15 AM decision, knowns, unknowns,
+  three residents, and the closed advance gate.
+- Evelyn's inquiry, Luis's self-report, human disposition, and time gate worked.
+- Walter's orientation preparation, Elena response, and coordinator verification
+  worked without asking the judge to impersonate Elena.
+- `get_shift_context({})` and `get_coverage_candidates({})` resolved Rose's
+  active uncovered shift without an internal ID. All four candidates received
+  the same eight checks; only Jordan was eligible.
+- Scheduler approval, 5:00 PM Jordan readiness, 7:35 PM visit evidence, outgoing
+  handoff approval, and incoming handoff receipt completed through the
+  coordinator-led flow.
+- A mid-flow refresh preserved the assignment and simulated time.
+- Reset restored the 9:15 AM opening state, and a second browser session opened
+  independently at the same clean baseline.
+- Browser console errors observed across the run: **0**.
+
 ## Deterministic outcomes observed
 
 - Unsafe medication-release paths exposed to WebMCP: **0**
@@ -81,10 +107,11 @@ Result: **3 test files passed, 32 tests passed, 0 failed.**
 ## Scope and honesty note
 
 These are executable application, schema, and server-contract evaluations. They
-do **not** claim to measure probabilistic LLM tool selection across 15–25 natural
-language prompts. That separate clean-room client evaluation remains a
-submission task and must be recorded only after it is actually run against the
-deployed WebMCP build. The project will not invent an agent-selection score.
+do **not** claim to measure probabilistic LLM tool selection across the complete
+natural-language prompt corpus. The production check directly invoked the same
+page-scoped tools a supported agent discovers, including the opening overview
+and natural-context coverage reads. The project will not invent an
+agent-selection score for prompts that were not run end-to-end by a model.
 
 The planned prompt corpus and expected selections are published in
 [NATURAL_LANGUAGE_EVAL_PLAN.md](NATURAL_LANGUAGE_EVAL_PLAN.md).

@@ -169,8 +169,12 @@ after the final cold-start production verification.
 - Career AI value: **Yes**
 - Built with: WebMCP, React, TypeScript, Vite, Cloudflare Workers, Cloudflare D1,
   Zod, OpenAI Sites, Codex, Vitest
-- Current automated verification: 31 tests plus TypeScript, public-repository
-  security audit, and production build.
+- Tested client: ChatGPT desktop in-app browser through Codex, with Site Tools
+  enabled, on the final Sites version 20 production deployment.
+- Current verification: 31 automated tests plus TypeScript, public-repository
+  security audit, production build, full six-block cold-start browser run,
+  mid-flow refresh, deterministic reset, second-session isolation, and zero
+  observed console errors.
 
 ## Known Limitations
 
@@ -188,8 +192,6 @@ proof of medication ingestion.
   do not infer.
 - **Devpost project/team:** create the separate Grapevine Care Devpost project,
   then add Sam Tate with the project invite link before submission.
-- **Tested clients:** replace the draft wording with the exact final cold-start
-  production result after the compatibility release is live.
 - **Screenshots/thumbnail:** capture from the final public build after cold-start
   verification.
 - **Codex session ID:** add if the final Devpost form requests one.
