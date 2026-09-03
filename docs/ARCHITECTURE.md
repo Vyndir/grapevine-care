@@ -47,10 +47,12 @@ the server's advance gate confirms the current decision is accounted for. It
 never reveals the answer to an open question, contacts a real person, or silently
 completes a human task. The coordinator receives the exact blocking requirement.
 
-`care_demo_team_inquiries` preserves the investigation chain: the source gap,
-bounded question, approval state, response code, response evidence class, and
-human closure. The seeded Luis response is explicitly a caregiver self-report;
-it does not become an independent EVV record.
+`care_demo_team_inquiries` preserves coordinator-to-caregiver investigation and
+readiness chains: the source gap, bounded question, approval state, response
+code, response evidence class, and human closure. The seeded Luis response is
+explicitly a caregiver self-report; it does not become an independent EVV
+record. The same structure keeps Jordan's 5:00 PM brief acknowledgement in
+Jordan's voice while the judge verifies readiness as the coordinator.
 
 ## Longitudinal care layer
 

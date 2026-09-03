@@ -1,7 +1,9 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { CareTeamDayView } from "./CareTeamDayView";
 import type { CareState, CareTeamHandoff, PreparedAction } from "./schemas";
+import type { CareActions } from "./useCare";
 
 type RegisteredTool = WebMCPTool;
 
@@ -201,6 +203,28 @@ describe("Grapevine Care", () => {
     fireEvent.click(screen.getByRole("button", { name: /Verify receipt and clear Elena/i }));
     expect((await screen.findAllByText(/Elena may proceed with Walter’s visit/i)).length).toBeGreaterThan(0);
     await waitFor(() => expect(nextAdvance).toBeEnabled());
+  });
+
+  it("keeps the judge in the coordinator role for Jordan's 5:00 PM readiness", async () => {
+    const prepareTeamInquiry = vi.fn(async () => ({ inquiry: {} as never, approval_required: true as const, external_side_effect: false as const }));
+    const state: CareState = {
+      ...structuredClone(baseState),
+      resident: { ...baseState.resident, scenario: "care_team_day", simulated_time: "2026-09-02T17:00:00-04:00" },
+      shifts: baseState.shifts.map((shift) => shift.id === "shift-wed-pm" ? { ...shift, assigned_caregiver_id: "caregiver-jordan", coverage_status: "assigned", visit_status: "not_started" } : shift),
+      care_team_day: {
+        step: 3,
+        step_label: "Replacement visit",
+        next_event_label: "Visit completion",
+        timeline: [{ step: 0, time: "9:15 AM", label: "Morning verification" }, { step: 1, time: "11:30 AM", label: "Assignment readiness" }, { step: 2, time: "2:15 PM", label: "Coverage recovery" }, { step: 3, time: "5:00 PM", label: "Replacement visit" }, { step: 4, time: "7:35 PM", label: "Visit completion" }],
+        residents: [{ id: "rose-demo", display_name: "Rose", age: 79, care_plan_version: "v4", support_setting: "Independent living", headline: "Jordan is assigned; readiness check needed", status: "attention", preferences: ["Call before visiting"], context: ["Mild memory difficulties"] }],
+        attention_queue: [{ id: "attention-rose-start", resident_id: "rose-demo", resident_name: "Rose", state: "attention_now", attention_reason: "Jordan is assigned; confirm her brief and visit readiness", deadline: "At the 5:00 PM visit", source: "Assignment record", policy_basis: "Current brief acknowledgement", known: ["Jordan is assigned"], unknown: ["Whether Jordan reviewed the current brief"], human_owner: "Care coordinator and Jordan" }],
+        orientation_packets: [], inquiries: [], advance_gate: { allowed: false, blockers: ["Prepare a current-brief readiness check-in for Jordan."], requirement: "Address the current block first." }
+      }
+    };
+    render(<CareTeamDayView state={state} actions={{ prepareTeamInquiry } as unknown as CareActions} busy={false} webmcp={{ supported: true, registered: true, error: null, count: 4, availableNames: ["prepare_team_inquiry"] }} onMessage={() => undefined} />);
+    expect(screen.queryByRole("button", { name: /I’m Jordan/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Prepare readiness check-in to Jordan/i }));
+    await waitFor(() => expect(prepareTeamInquiry).toHaveBeenCalledWith(expect.objectContaining({ resident_ref: "Rose", caregiver_id: "caregiver-jordan" })));
   });
 
   it("keeps the technical safety contract available without competing with the care workflow", async () => {

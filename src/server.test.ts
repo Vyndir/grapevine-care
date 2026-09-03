@@ -41,6 +41,7 @@ class TestD1 {
     this.sqlite.exec(readFileSync(new URL("../drizzle/0006_care_team_day.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0007_inquiry_driven_day.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0008_orientation_follow_up.sql", import.meta.url), "utf8"));
+    this.sqlite.exec(readFileSync(new URL("../drizzle/0009_shift_readiness_inquiries.sql", import.meta.url), "utf8"));
   }
   close() { this.sqlite.close(); }
 }
@@ -327,6 +328,33 @@ describe("Grapevine Care server invariants", () => {
     expect(current.care_team_day?.step).toBe(2);
     expect(current.shifts.find((shift) => shift.id === "shift-wed-pm")).toMatchObject({ coverage_status: "coverage_needed", assigned_caregiver_id: null });
     expect(current.care_team_day?.attention_queue.find((item) => item.resident_id === "rose-demo")?.attention_reason).toContain("called out");
+
+    const shiftContext = await (await call(runA, "/api/care/shift-context", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm" }) })).json() as { schedule_snapshot_id: string };
+    const candidates = await (await call(runA, "/api/care/coverage-candidates", { method: "POST", body: "{}" })).json() as { candidates: Array<{ caregiver: { id: string }; eligible: boolean }> };
+    const jordan = candidates.candidates.find((candidate) => candidate.caregiver.id === "caregiver-jordan");
+    expect(jordan?.eligible).toBe(true);
+    const coverage = await (await call(runA, "/api/care/coverage-proposals", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm", caregiver_id: "caregiver-jordan", schedule_snapshot_id: shiftContext.schedule_snapshot_id, reason: "Jordan passes every explicit constraint for Rose's evening visit.", idempotency_key: "team-day-jordan-coverage" }) })).json() as { proposal: { id: string } };
+    await call(runA, `/api/care/coverage-proposals/${coverage.proposal.id}/resolve`, { method: "POST", body: JSON.stringify({ resolution: "approved_in_demo" }) });
+    expect((await state(runA)).care_team_day?.advance_gate.allowed).toBe(true);
+    await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" });
+    current = await state(runA);
+    expect(current.care_team_day?.step).toBe(3);
+    expect(current.care_team_day?.advance_gate.blockers[0]).toContain("readiness check-in");
+
+    const readinessResponse = await call(runA, "/api/care/team-inquiries", { method: "POST", body: JSON.stringify({ resident_ref: "Rose", caregiver_id: "caregiver-jordan", prompt: "Please review Rose's current brief and confirm whether you are ready to begin the visit.", idempotency_key: "jordan-readiness-001" }) });
+    expect(readinessResponse.status).toBe(200);
+    const readiness = await readinessResponse.json() as { inquiry: { id: string; inquiry_type: string; status: string }; approval_required: boolean };
+    expect(readiness).toMatchObject({ inquiry: { inquiry_type: "shift_readiness", status: "awaiting_coordinator_approval" }, approval_required: true });
+    expect((await call(runA, `/api/care/team-inquiries/${readiness.inquiry.id}/resolve`, { method: "POST", body: JSON.stringify({ decision: "send_in_demo" }) })).status).toBe(200);
+    current = await state(runA);
+    expect(current.care_team_day?.inquiries.find((item) => item.inquiry_type === "shift_readiness")).toMatchObject({ status: "response_received", response_code: "ready_for_visit", response_detail: expect.stringContaining("Can you verify") });
+    expect(current.shifts.find((shift) => shift.id === "shift-wed-pm")?.visit_status).toBe("not_started");
+    expect((await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" })).status).toBe(409);
+    expect((await call(runA, `/api/care/team-inquiries/${readiness.inquiry.id}/close`, { method: "POST", body: "{}" })).status).toBe(200);
+    current = await state(runA);
+    expect(current.shifts.find((shift) => shift.id === "shift-wed-pm")?.visit_status).toBe("in_progress");
+    expect(current.care_team_day?.advance_gate.allowed).toBe(true);
+    expect(current.visit_events.find((event) => event.event_type === "shift_checked_in")?.detail).toContain("coordinator verified");
   });
 
   it("rejects unsafe channels and oversized bodies", async () => {

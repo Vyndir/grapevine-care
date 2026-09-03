@@ -35,7 +35,7 @@ rail make time the spine of the experience:
    receipt before clearing her to proceed.
 3. **2:15 PM · Rose:** Maya calls out before the evening visit. Deterministic
    constraints identify Jordan as the eligible replacement; a scheduler approves.
-4. **5:00 PM · Replacement visit:** Jordan reviews context and starts the visit.
+4. **5:00 PM · Replacement visit:** the agent prepares a current-brief readiness check-in, the coordinator sends it, Jordan responds in her own voice, and the coordinator verifies her response before the visit begins.
 5. **7:35 PM · Visit completion:** bounded observations are recorded without
    clinical inference.
 6. **8:00 PM · Continuity handoff:** the agent prepares a handoff; Jordan approves;

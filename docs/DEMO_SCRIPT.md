@@ -51,7 +51,7 @@ approval. Point out that the agent prepares; the person changes the schedule.
 
 ## 2:25–2:48 — The rest of the shift remains accountable
 
-Use the progress rail to preview the remaining stages: incoming brief at 5:00 PM,
+Use the progress rail to preview the remaining stages: a coordinator-led readiness check-in with Jordan at 5:00 PM,
 bounded visit evidence at 7:35 PM, and outgoing approval plus recipient
 acknowledgement at 8:00 PM. Mention that each later block is subject to the same
 advance gate and human-authority rule.

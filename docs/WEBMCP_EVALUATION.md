@@ -86,3 +86,6 @@ The clean-room natural-language corpus is published separately in
   visible workflow transitions rather than agent capabilities.
 - Natural `resident_ref` values resolve exactly one resident or fail without
   guessing.
+- At 5:00 PM, `prepare_team_inquiry` stages Jordan's current-brief readiness
+  question. It cannot answer for her or start the visit; Jordan's simulated
+  response and the coordinator's verification remain visible human transitions.

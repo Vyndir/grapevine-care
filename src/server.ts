@@ -53,7 +53,7 @@ type DbVisitEvent = { visit_event_id: string; shift_id: string; caregiver_id: st
 type DbShiftHandoff = { shift_handoff_id: string; shift_id: string; from_caregiver_id: string; to_caregiver_id: string; schedule_snapshot_id: string; completed_json: string; observed_json: string; unresolved_json: string; status: "awaiting_caregiver_approval" | "available_to_next_caregiver" | "dismissed" | "acknowledged"; idempotency_key: string; created_at: string; resolved_at: string | null; };
 type DbHandoffAcknowledgement = { acknowledgement_id: string; shift_handoff_id: string; caregiver_id: string; acknowledged_at: string; };
 type DbOrientationPacket = { packet_id: string; resident_id: "rose-demo" | "walter-demo" | "evelyn-demo"; caregiver_id: string; care_plan_version: string; status: "awaiting_coordinator_outreach" | "response_received" | "verified"; reason: string; idempotency_key: string; created_at: string; response_detail: string | null; responded_at: string | null; verified_at: string | null; };
-type DbTeamInquiry = { inquiry_id: string; resident_id: "rose-demo" | "walter-demo" | "evelyn-demo"; caregiver_id: string; inquiry_type: "visit_verification"; prompt: string; status: "awaiting_coordinator_approval" | "response_received" | "resolved" | "dismissed"; response_code: "arrived_verification_failed" | "delayed" | "cannot_attend" | "no_response" | null; response_detail: string | null; idempotency_key: string; created_at: string; responded_at: string | null; resolved_at: string | null; };
+type DbTeamInquiry = { inquiry_id: string; resident_id: "rose-demo" | "walter-demo" | "evelyn-demo"; caregiver_id: string; inquiry_type: "visit_verification" | "shift_readiness"; prompt: string; status: "awaiting_coordinator_approval" | "response_received" | "resolved" | "dismissed"; response_code: "arrived_verification_failed" | "delayed" | "cannot_attend" | "no_response" | "ready_for_visit" | null; response_detail: string | null; idempotency_key: string; created_at: string; responded_at: string | null; resolved_at: string | null; };
 
 const residentId = "rose-demo";
 const demoRunHeader = "x-grapevine-demo-run";
@@ -301,6 +301,7 @@ function buildCareTeamDay(run: DbRun, shifts: DbShift[], packets: DbOrientationP
   const orientationPackets = packets.map(publicOrientationPacket);
   const inquiries = inquiryRows.map(publicTeamInquiry);
   const evelynInquiry = inquiries.find((inquiry) => inquiry.resident_id === "evelyn-demo" && inquiry.inquiry_type === "visit_verification");
+  const jordanReadiness = inquiries.find((inquiry) => inquiry.resident_id === "rose-demo" && inquiry.inquiry_type === "shift_readiness");
   const evelynResolved = evelynInquiry?.status === "resolved";
   const walterPacket = orientationPackets.find((packet) => packet.resident_id === "walter-demo" && packet.caregiver_id === "caregiver-elena");
   const orientationVerified = walterPacket?.status === "verified";
@@ -355,20 +356,20 @@ function buildCareTeamDay(run: DbRun, shifts: DbShift[], packets: DbOrientationP
       id: `attention-rose-${stage}`,
       resident_id: "rose-demo",
       resident_name: "Rose",
-      state: stage === "start" ? (visitStarted ? "resolved" : "attention_now") : stage === "complete" ? (visitCompleted ? "resolved" : "attention_now") : (handoffAcknowledged ? "resolved" : roseShift?.handoff_status === "available_to_next_caregiver" ? "waiting_on_human" : "attention_now"),
-      attention_reason: stage === "start" ? (visitStarted ? "Jordan acknowledged the brief and started the visit" : "Jordan must review the brief and start the visit") : stage === "complete" ? (visitCompleted ? "Jordan completed the visit and recorded bounded observations" : "Record the visit outcome before the handoff") : (handoffAcknowledged ? "Luis acknowledged the continuity handoff" : "Prepare, approve, and acknowledge the continuity handoff"),
+      state: stage === "start" ? (visitStarted ? "resolved" : jordanReadiness ? "waiting_on_human" : "attention_now") : stage === "complete" ? (visitCompleted ? "resolved" : "attention_now") : (handoffAcknowledged ? "resolved" : roseShift?.handoff_status === "available_to_next_caregiver" ? "waiting_on_human" : "attention_now"),
+      attention_reason: stage === "start" ? (visitStarted ? "Jordan’s readiness was verified and the visit began" : jordanReadiness?.status === "response_received" ? "Jordan replied; verify her readiness before the visit begins" : jordanReadiness ? "Jordan’s readiness check-in is awaiting coordinator action" : "Jordan is assigned; confirm her brief and visit readiness") : stage === "complete" ? (visitCompleted ? "Jordan completed the visit and recorded bounded observations" : "Record the visit outcome before the handoff") : (handoffAcknowledged ? "Luis acknowledged the continuity handoff" : "Prepare, approve, and acknowledge the continuity handoff"),
       deadline: stage === "start" ? "At the 5:00 PM visit" : stage === "complete" ? "Before 8:00 PM handoff" : "End-of-day continuity checkpoint",
       source: "Assignment, visit evidence, and handoff records",
       policy_basis: "Every transition requires an accountable human acknowledgement",
       known: [roseShift?.assigned_caregiver_id ? "An approved caregiver is assigned" : "No caregiver is assigned", `Visit status: ${roseShift?.visit_status ?? "unknown"}`, `Handoff status: ${roseShift?.handoff_status ?? "unknown"}`],
-      unknown: stage === "start" && !visitStarted ? ["Whether Jordan reviewed the current brief"] : stage === "complete" && !visitCompleted ? ["What occurred during the visit"] : stage === "handoff" && !handoffAcknowledged ? ["Whether the next caregiver received and acknowledged continuity context"] : [],
-      human_owner: stage === "handoff" ? "Jordan and Luis" : "Jordan"
+      unknown: stage === "start" && !visitStarted ? (jordanReadiness?.status === "response_received" ? ["Coordinator verification is still required before Jordan proceeds"] : ["Whether Jordan reviewed the current brief and is ready to begin"]) : stage === "complete" && !visitCompleted ? ["What occurred during the visit"] : stage === "handoff" && !handoffAcknowledged ? ["Whether the next caregiver received and acknowledged continuity context"] : [],
+      human_owner: stage === "handoff" ? "Jordan and Luis" : stage === "start" ? "Care coordinator and Jordan" : "Jordan"
     });
   }
   const blockers = step === 0 ? (evelynResolved ? [] : [evelynInquiry?.status === "response_received" ? "Review Luis’s response and close Evelyn’s verification exception." : evelynInquiry ? "Approve the prepared check-in and review Luis’s response." : "Investigate Evelyn’s missing verification record by checking in with Luis."])
     : step === 1 ? (orientationVerified ? [] : [walterPacket?.status === "response_received" ? "Verify Elena’s submitted acknowledgement and clear her to proceed." : walterPacket ? "Send the prepared readiness follow-up to Elena and review her response." : "Prepare Walter’s packet and readiness follow-up for Elena."])
     : step === 2 ? (roseResolved ? [] : ["A scheduler must approve qualified replacement coverage for Rose."])
-    : step === 3 ? (roseShift?.visit_status === "in_progress" || roseShift?.visit_status === "completed" ? [] : ["Jordan must acknowledge the current brief and start the visit."])
+    : step === 3 ? (roseShift?.visit_status === "in_progress" || roseShift?.visit_status === "completed" ? [] : [jordanReadiness?.status === "response_received" ? "Verify Jordan’s readiness response and clear the visit to begin." : jordanReadiness ? "Send the prepared readiness check-in and review Jordan’s response." : "Prepare a current-brief readiness check-in for Jordan."])
     : step === 4 ? (roseShift?.visit_status === "completed" ? [] : ["Jordan must record the visit outcome before handoff."])
     : (roseShift?.handoff_status === "acknowledged" ? [] : ["The outgoing caregiver must approve the handoff and Luis must acknowledge it."]);
   return {
@@ -570,17 +571,24 @@ async function prepareTeamInquiry(db: D1Database, runId: string, body: Record<st
   const parsed = prepareTeamInquiryArgsSchema.safeParse(body);
   if (!parsed.success) return json({ error: "Invalid team inquiry request." }, 400);
   const state = await loadCareState(db, runId);
-  if (!state?.care_team_day || state.care_team_day.step !== 0) return json({ error: "The Evelyn verification inquiry is available only during the morning verification block." }, 409);
+  if (!state?.care_team_day) return json({ error: "Care Team Day is not active." }, 409);
   const resident = resolveTeamResidentRef(state, parsed.data.resident_ref);
-  if (resident !== "evelyn-demo" || parsed.data.caregiver_id !== "caregiver-luis") return json({ error: "This investigation must ask Evelyn's assigned caregiver, Luis, about the missing visit verification." }, 409);
+  const roseShift = state.shifts.find((shift) => shift.id === "shift-wed-pm");
+  const isEvelynVerification = state.care_team_day.step === 0 && resident === "evelyn-demo" && parsed.data.caregiver_id === "caregiver-luis";
+  const isJordanReadiness = state.care_team_day.step === 3 && resident === "rose-demo" && parsed.data.caregiver_id === "caregiver-jordan" && roseShift?.assigned_caregiver_id === "caregiver-jordan" && roseShift.visit_status === "not_started";
+  if (!isEvelynVerification && !isJordanReadiness) return json({ error: "This inquiry must address the assigned caregiver and the active care-team decision." }, 409);
+  const inquiryType = isJordanReadiness ? "shift_readiness" : "visit_verification";
   const duplicate = await db.prepare("SELECT * FROM care_demo_team_inquiries WHERE run_id = ? AND idempotency_key = ?").bind(runId, parsed.data.idempotency_key).first<DbTeamInquiry>();
   if (duplicate) return json({ inquiry: publicTeamInquiry(duplicate), approval_required: duplicate.status === "awaiting_coordinator_approval", external_side_effect: false, idempotent_replay: true });
-  const existing = await db.prepare("SELECT inquiry_id FROM care_demo_team_inquiries WHERE run_id = ? AND inquiry_type = 'visit_verification' AND status != 'dismissed' LIMIT 1").bind(runId).first<{ inquiry_id: string }>();
-  if (existing) return json({ error: "A visit-verification inquiry is already active." }, 409);
+  const existing = await db.prepare("SELECT inquiry_id FROM care_demo_team_inquiries WHERE run_id = ? AND inquiry_type = ? AND status != 'dismissed' LIMIT 1").bind(runId, inquiryType).first<{ inquiry_id: string }>();
+  if (existing) return json({ error: inquiryType === "shift_readiness" ? "A Jordan readiness check-in is already active." : "A visit-verification inquiry is already active." }, 409);
   const inquiryId = `inq_${crypto.randomUUID()}`;
+  const evidence = inquiryType === "shift_readiness"
+    ? { event_type: "shift_readiness_inquiry_prepared", summary: "Jordan readiness check-in prepared", detail: "The agent staged a current-brief readiness question for Jordan. Nothing was sent and no visit was started until the coordinator reviews the check-in.", source: "WebMCP tool · coordinator approval required", trust_boundary: "agent_prepared_shift_readiness_inquiry", plan_version: "v4" }
+    : { event_type: "visit_verification_inquiry_prepared", summary: "Luis check-in prepared", detail: "The agent staged a bounded operational question. Nothing was sent until the coordinator reviews it.", source: "WebMCP tool · coordinator approval required", trust_boundary: "agent_prepared_team_inquiry", plan_version: "v3" };
   await db.batch([
-    db.prepare("INSERT INTO care_demo_team_inquiries (run_id, inquiry_id, resident_id, caregiver_id, inquiry_type, prompt, status, response_code, response_detail, idempotency_key, created_at, responded_at, resolved_at) VALUES (?, ?, 'evelyn-demo', 'caregiver-luis', 'visit_verification', ?, 'awaiting_coordinator_approval', NULL, NULL, ?, ?, NULL, NULL)").bind(runId, inquiryId, parsed.data.prompt, parsed.data.idempotency_key, state.resident.simulated_time),
-    evidenceInsert(db, runId, { resident_id: "evelyn-demo", event_type: "visit_verification_inquiry_prepared", severity: "attention", summary: "Luis check-in prepared", detail: "The agent staged a bounded operational question. Nothing was sent until the coordinator reviews it.", source: "WebMCP tool · coordinator approval required", occurred_at: state.resident.simulated_time, actor_type: "agent", actor_id: "page-agent", evidence_type: "prepared_action", observed_at: state.resident.simulated_time, recorded_at: state.resident.simulated_time, trust_boundary: "agent_prepared_team_inquiry", plan_version: "v3" }),
+    db.prepare("INSERT INTO care_demo_team_inquiries (run_id, inquiry_id, resident_id, caregiver_id, inquiry_type, prompt, status, response_code, response_detail, idempotency_key, created_at, responded_at, resolved_at) VALUES (?, ?, ?, ?, ?, ?, 'awaiting_coordinator_approval', NULL, NULL, ?, ?, NULL, NULL)").bind(runId, inquiryId, resident, parsed.data.caregiver_id, inquiryType, parsed.data.prompt, parsed.data.idempotency_key, state.resident.simulated_time),
+    evidenceInsert(db, runId, { resident_id: resident!, event_type: evidence.event_type, severity: "attention", summary: evidence.summary, detail: evidence.detail, source: evidence.source, occurred_at: state.resident.simulated_time, actor_type: "agent", actor_id: "page-agent", evidence_type: "prepared_action", observed_at: state.resident.simulated_time, recorded_at: state.resident.simulated_time, trust_boundary: evidence.trust_boundary, plan_version: evidence.plan_version }),
     versionBump(db, runId, state.resident.simulated_time)
   ]);
   const inquiry = await db.prepare("SELECT * FROM care_demo_team_inquiries WHERE run_id = ? AND inquiry_id = ?").bind(runId, inquiryId).first<DbTeamInquiry>();
@@ -602,10 +610,14 @@ async function resolveTeamInquiry(db: D1Database, runId: string, inquiryId: stri
     return json({ state: await loadCareState(db, runId), external_side_effect: false });
   }
   const respondedAt = plusMinutes(run.simulated_time, 3);
-  const responseDetail = "Luis reports: ‘I arrived at 9:08 AM. My EVV application would not complete check-in, so I began the scheduled visit and am with Evelyn now.’";
+  const isReadiness = inquiry.inquiry_type === "shift_readiness";
+  const responseCode = isReadiness ? "ready_for_visit" : "arrived_verification_failed";
+  const responseDetail = isReadiness
+    ? "Jordan reports: ‘I reviewed Rose’s current brief, Care Plan v4, the changes since my last visit, and the unresolved nurse-review item. I am at Rose’s residence and ready to begin. Can you verify that you see my acknowledgement?’"
+    : "Luis reports: ‘I arrived at 9:08 AM. My EVV application would not complete check-in, so I began the scheduled visit and am with Evelyn now.’";
   await db.batch([
-    db.prepare("UPDATE care_demo_team_inquiries SET status = 'response_received', response_code = 'arrived_verification_failed', response_detail = ?, responded_at = ? WHERE run_id = ? AND inquiry_id = ? AND status = 'awaiting_coordinator_approval'").bind(responseDetail, respondedAt, runId, inquiryId),
-    evidenceInsert(db, runId, { resident_id: "evelyn-demo", event_type: "caregiver_visit_status_response", severity: "routine", summary: "Luis responded to the verification inquiry", detail: responseDetail, source: "Luis · simulated caregiver self-report", occurred_at: respondedAt, actor_type: "caregiver", actor_id: "caregiver-luis", evidence_type: "self_report", observed_at: respondedAt, recorded_at: respondedAt, trust_boundary: "caregiver_self_report_not_independent_evv", plan_version: "v3" }),
+    db.prepare("UPDATE care_demo_team_inquiries SET status = 'response_received', response_code = ?, response_detail = ?, responded_at = ? WHERE run_id = ? AND inquiry_id = ? AND status = 'awaiting_coordinator_approval'").bind(responseCode, responseDetail, respondedAt, runId, inquiryId),
+    evidenceInsert(db, runId, { resident_id: inquiry.resident_id, event_type: isReadiness ? "caregiver_shift_readiness_response" : "caregiver_visit_status_response", severity: "routine", summary: isReadiness ? "Jordan responded to the readiness check-in" : "Luis responded to the verification inquiry", detail: responseDetail, source: isReadiness ? "Jordan · simulated caregiver self-report" : "Luis · simulated caregiver self-report", occurred_at: respondedAt, actor_type: "caregiver", actor_id: inquiry.caregiver_id, evidence_type: "self_report", observed_at: respondedAt, recorded_at: respondedAt, trust_boundary: isReadiness ? "caregiver_readiness_self_report_pending_coordinator_verification" : "caregiver_self_report_not_independent_evv", plan_version: isReadiness ? "v4" : "v3" }),
     versionBump(db, runId, respondedAt)
   ]);
   return json({ state: await loadCareState(db, runId), response_received: true, external_side_effect: false });
@@ -616,7 +628,20 @@ async function closeTeamInquiry(db: D1Database, runId: string, inquiryId: string
   const inquiry = await db.prepare("SELECT * FROM care_demo_team_inquiries WHERE run_id = ? AND inquiry_id = ?").bind(runId, inquiryId).first<DbTeamInquiry>();
   if (!run || !inquiry) return json({ error: "Team inquiry not found." }, 404);
   if (inquiry.status === "resolved") return json({ state: await loadCareState(db, runId), already_resolved: true, external_side_effect: false });
-  if (inquiry.status !== "response_received") return json({ error: "Review a caregiver response before closing the verification exception." }, 409);
+  if (inquiry.status !== "response_received") return json({ error: "Review the caregiver response before recording a disposition." }, 409);
+  if (inquiry.inquiry_type === "shift_readiness") {
+    const shift = await db.prepare("SELECT * FROM care_demo_shifts WHERE run_id = ? AND shift_id = 'shift-wed-pm'").bind(runId).first<DbShift>();
+    if (!shift || shift.assigned_caregiver_id !== inquiry.caregiver_id || shift.coverage_status !== "assigned" || shift.visit_status !== "not_started") return json({ error: "Jordan's assignment is no longer eligible for readiness clearance." }, 409);
+    const startedAt = plusMinutes(inquiry.responded_at ?? run.simulated_time, 2);
+    await db.batch([
+      db.prepare("UPDATE care_demo_team_inquiries SET status = 'resolved', resolved_at = ? WHERE run_id = ? AND inquiry_id = ? AND status = 'response_received'").bind(startedAt, runId, inquiryId),
+      db.prepare("UPDATE care_demo_shifts SET visit_status = 'in_progress', version = version + 1 WHERE run_id = ? AND shift_id = 'shift-wed-pm' AND visit_status = 'not_started'").bind(runId),
+      db.prepare("INSERT INTO care_demo_visit_events (run_id, visit_event_id, shift_id, caregiver_id, event_type, summary, detail, occurred_at, evidence_class) VALUES (?, ?, 'shift-wed-pm', ?, 'shift_checked_in', 'Visit check-in recorded', 'Jordan reported reviewing the current assignment brief. The coordinator verified the response and cleared the simulated visit to begin.', ?, 'caregiver_attestation_plus_coordinator_verification')").bind(runId, `visit_${crypto.randomUUID()}`, inquiry.caregiver_id, startedAt),
+      evidenceInsert(db, runId, { resident_id: "rose-demo", event_type: "shift_readiness_verified", severity: "routine", summary: "Jordan cleared to begin Rose’s visit", detail: "The coordinator verified Jordan’s current-brief acknowledgement and readiness response before the simulated visit began.", source: "Care coordinator · explicit human verification", occurred_at: startedAt, actor_type: "caregiver", actor_id: "coordinator-demo", evidence_type: "human_decision", observed_at: startedAt, recorded_at: startedAt, trust_boundary: "coordinator_verified_caregiver_readiness", plan_version: "v4" }),
+      db.prepare("UPDATE care_demo_runs SET simulated_time = ?, evidence_version = evidence_version + 1, updated_at = ? WHERE run_id = ?").bind(startedAt, startedAt, runId)
+    ]);
+    return json({ state: await loadCareState(db, runId), readiness_verified: true, visit_started: true, external_side_effect: false });
+  }
   await db.batch([
     db.prepare("UPDATE care_demo_team_inquiries SET status = 'resolved', resolved_at = ? WHERE run_id = ? AND inquiry_id = ? AND status = 'response_received'").bind(run.simulated_time, runId, inquiryId),
     evidenceInsert(db, runId, { resident_id: "evelyn-demo", event_type: "visit_verification_exception_resolved", severity: "routine", summary: "Visit-verification exception resolved", detail: "The coordinator reviewed Luis's self-report and documented an EVV application failure. No earlier absence or clinical conclusion was inferred.", source: "Care coordinator · explicit human disposition", occurred_at: run.simulated_time, actor_type: "caregiver", actor_id: "coordinator-demo", evidence_type: "human_decision", observed_at: run.simulated_time, recorded_at: run.simulated_time, trust_boundary: "explicit_coordinator_disposition", plan_version: "v3" }),

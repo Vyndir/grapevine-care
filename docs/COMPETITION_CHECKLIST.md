@@ -29,6 +29,7 @@ Verified against the official challenge and Devpost rules on August 31, 2026.
 - [x] Deterministic eight-constraint caregiver eligibility with no opaque ranking score
 - [x] Schedule-snapshot binding and stale-shift rejection
 - [x] Human-only scheduler approval, visit acknowledgement, handoff approval, and recipient acknowledgement
+- [x] Coordinator-led 5:00 PM readiness loop; the judge never impersonates Jordan to acknowledge her brief
 - [x] “Since you were last here” assignment brief with unchanged facts and explicit unknowns
 - [x] Simulated EVV events that do not treat missing check-in as proof of absence
 - [x] Multi-resident Care Team Day with exactly three distinct operational needs

@@ -56,6 +56,8 @@ export function expectedToolNames(state: CareState | null, workspace: WebMCPWork
     const walterPacket = state.care_team_day?.orientation_packets.find((packet) => packet.resident_id === "walter-demo");
     if ((state.care_team_day?.step ?? 0) >= 1 && !walterPacket) names.push("prepare_assignment_orientation");
     const roseShift = state.shifts.find((item) => item.id === "shift-wed-pm");
+    const jordanReadiness = state.care_team_day?.inquiries.find((inquiry) => inquiry.resident_id === "rose-demo" && inquiry.inquiry_type === "shift_readiness");
+    if ((state.care_team_day?.step ?? 0) === 3 && roseShift?.assigned_caregiver_id === "caregiver-jordan" && roseShift.visit_status === "not_started" && !jordanReadiness) names.push("prepare_team_inquiry");
     if (roseShift?.coverage_status === "coverage_needed") names.push("get_coverage_candidates", "prepare_shift_coverage");
     if (roseShift?.assigned_caregiver_id && roseShift.assigned_caregiver_id !== "caregiver-maya" && roseShift.visit_status !== "completed") names.push("get_changes_since_last_shift", "get_shift_brief");
     if (roseShift?.visit_status === "completed" && roseShift.handoff_status === "ready") names.push("prepare_shift_handoff");
@@ -211,7 +213,7 @@ export function useWebMCPTools(actions: CareActions, state: CareState | null, wo
     } satisfies WebMCPTool,
     teamInquiry: {
       name: "prepare_team_inquiry", title: "Prepare caregiver status inquiry",
-      description: "Stage a bounded check-in to Evelyn's assigned caregiver, Luis, to investigate missing visit-verification evidence. It does not claim he is absent and sends nothing until the coordinator approves the visible draft.",
+      description: "Stage the bounded caregiver check-in required by the current Care Team Day decision. It can investigate Evelyn's missing visit-verification evidence or ask Jordan to review Rose's current brief and confirm visit readiness. It never speaks for the caregiver, sends nothing until coordinator approval, and cannot start a visit.",
       inputSchema: toolInputSchemas.prepareTeamInquiry, annotations: baseAnnotations,
       async execute(args: unknown) { return actions.prepareTeamInquiry(parseArgs(prepareTeamInquiryArgsSchema, args)); }
     } satisfies WebMCPTool,
