@@ -58,6 +58,12 @@ export function expectedToolNames(state: CareState | null, workspace: WebMCPWork
     const roseShift = state.shifts.find((item) => item.id === "shift-wed-pm");
     const jordanReadiness = state.care_team_day?.inquiries.find((inquiry) => inquiry.resident_id === "rose-demo" && inquiry.inquiry_type === "shift_readiness");
     if ((state.care_team_day?.step ?? 0) === 3 && roseShift?.assigned_caregiver_id === "caregiver-jordan" && roseShift.visit_status === "not_started" && !jordanReadiness) names.push("prepare_team_inquiry");
+    const jordanVisitOutcome = state.care_team_day?.inquiries.find((inquiry) => inquiry.resident_id === "rose-demo" && inquiry.inquiry_type === "visit_outcome");
+    if ((state.care_team_day?.step ?? 0) === 4 && roseShift?.assigned_caregiver_id === "caregiver-jordan" && roseShift.visit_status === "in_progress" && !jordanVisitOutcome) names.push("prepare_team_inquiry");
+    const activeHandoff = state.shift_handoffs.find((handoff) => handoff.shift_id === "shift-wed-pm" && handoff.status !== "dismissed");
+    const handoffInquiryType = activeHandoff?.status === "awaiting_caregiver_approval" ? "handoff_approval" : activeHandoff?.status === "available_to_next_caregiver" ? "handoff_receipt" : null;
+    const activeHandoffInquiry = state.care_team_day?.inquiries.find((inquiry) => inquiry.inquiry_type === handoffInquiryType);
+    if ((state.care_team_day?.step ?? 0) === 5 && handoffInquiryType && !activeHandoffInquiry) names.push("prepare_team_inquiry");
     if (roseShift?.coverage_status === "coverage_needed") names.push("get_coverage_candidates", "prepare_shift_coverage");
     if (roseShift?.assigned_caregiver_id && roseShift.assigned_caregiver_id !== "caregiver-maya" && roseShift.visit_status !== "completed") names.push("get_changes_since_last_shift", "get_shift_brief");
     if (roseShift?.visit_status === "completed" && roseShift.handoff_status === "ready") names.push("prepare_shift_handoff");
@@ -213,7 +219,7 @@ export function useWebMCPTools(actions: CareActions, state: CareState | null, wo
     } satisfies WebMCPTool,
     teamInquiry: {
       name: "prepare_team_inquiry", title: "Prepare caregiver status inquiry",
-      description: "Stage the bounded caregiver check-in required by the current Care Team Day decision. It can investigate Evelyn's missing visit-verification evidence or ask Jordan to review Rose's current brief and confirm visit readiness. It never speaks for the caregiver, sends nothing until coordinator approval, and cannot start a visit.",
+      description: "Stage the bounded caregiver check-in required by the current Care Team Day decision. It can investigate missing verification, request readiness or visit evidence, ask Jordan to approve a prepared handoff, or ask Luis to confirm receipt. It never speaks for a caregiver, sends nothing until coordinator approval, and cannot itself start or complete a visit or acknowledge a handoff.",
       inputSchema: toolInputSchemas.prepareTeamInquiry, annotations: baseAnnotations,
       async execute(args: unknown) { return actions.prepareTeamInquiry(parseArgs(prepareTeamInquiryArgsSchema, args)); }
     } satisfies WebMCPTool,

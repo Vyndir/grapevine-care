@@ -89,3 +89,9 @@ The clean-room natural-language corpus is published separately in
 - At 5:00 PM, `prepare_team_inquiry` stages Jordan's current-brief readiness
   question. It cannot answer for her or start the visit; Jordan's simulated
   response and the coordinator's verification remain visible human transitions.
+- At 7:35 PM, the same state-dependent tool stages a bounded visit-update request.
+  It cannot manufacture observations or complete the visit; Jordan's submitted
+  record and coordinator verification create the continuity evidence.
+- At 8:00 PM, `prepare_shift_handoff` stages the evidence package while
+  `prepare_team_inquiry` separately requests Jordan's approval and Luis's receipt.
+  Neither response is manufactured or acknowledged by an agent.

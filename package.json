@@ -1,6 +1,6 @@
 {
   "name": "grapevine-care-webmcp",
-  "version": "1.12.0",
+  "version": "1.14.0",
   "description": "Grapevine Care, a safety-first caregiver continuity simulation using WebMCP.",
   "license": "MIT",
   "repository": {
@@ -29,7 +29,7 @@
   "type": "module",
   "scripts": {
     "start": "vite dev",
-    "db:local": "wrangler d1 execute grapevine-care --local --file drizzle/0001_grapevine_care.sql && wrangler d1 execute grapevine-care --local --file drizzle/0002_demo_run_isolation.sql && wrangler d1 execute grapevine-care --local --file drizzle/0003_evidence_resolution_loop.sql && wrangler d1 execute grapevine-care --local --file drizzle/0004_longitudinal_care_story.sql && wrangler d1 execute grapevine-care --local --file drizzle/0005_caregiver_continuity_loop.sql && wrangler d1 execute grapevine-care --local --file drizzle/0006_care_team_day.sql && wrangler d1 execute grapevine-care --local --file drizzle/0007_inquiry_driven_day.sql && wrangler d1 execute grapevine-care --local --file drizzle/0008_orientation_follow_up.sql && wrangler d1 execute grapevine-care --local --file drizzle/0009_shift_readiness_inquiries.sql",
+    "db:local": "wrangler d1 execute grapevine-care --local --file drizzle/0001_grapevine_care.sql && wrangler d1 execute grapevine-care --local --file drizzle/0002_demo_run_isolation.sql && wrangler d1 execute grapevine-care --local --file drizzle/0003_evidence_resolution_loop.sql && wrangler d1 execute grapevine-care --local --file drizzle/0004_longitudinal_care_story.sql && wrangler d1 execute grapevine-care --local --file drizzle/0005_caregiver_continuity_loop.sql && wrangler d1 execute grapevine-care --local --file drizzle/0006_care_team_day.sql && wrangler d1 execute grapevine-care --local --file drizzle/0007_inquiry_driven_day.sql && wrangler d1 execute grapevine-care --local --file drizzle/0008_orientation_follow_up.sql && wrangler d1 execute grapevine-care --local --file drizzle/0009_shift_readiness_inquiries.sql && wrangler d1 execute grapevine-care --local --file drizzle/0010_visit_outcome_inquiries.sql && wrangler d1 execute grapevine-care --local --file drizzle/0011_handoff_confirmation_inquiries.sql",
     "build": "vite build",
     "deploy": "vite build && wrangler deploy",
     "audit:public": "node scripts/audit-public.mjs",

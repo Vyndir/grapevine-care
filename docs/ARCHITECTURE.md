@@ -53,6 +53,10 @@ code, response evidence class, and human closure. The seeded Luis response is
 explicitly a caregiver self-report; it does not become an independent EVV
 record. The same structure keeps Jordan's 5:00 PM brief acknowledgement in
 Jordan's voice while the judge verifies readiness as the coordinator.
+At 7:35 PM it also preserves the request, Jordan's bounded visit record, and the
+coordinator verification that makes the record eligible for handoff preparation.
+At 8:00 PM, separate requests and responses preserve Jordan's approval and Luis's
+receipt before the coordinator verifies each side of the continuity transfer.
 
 ## Longitudinal care layer
 

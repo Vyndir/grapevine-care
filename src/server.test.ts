@@ -42,6 +42,8 @@ class TestD1 {
     this.sqlite.exec(readFileSync(new URL("../drizzle/0007_inquiry_driven_day.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0008_orientation_follow_up.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0009_shift_readiness_inquiries.sql", import.meta.url), "utf8"));
+    this.sqlite.exec(readFileSync(new URL("../drizzle/0010_visit_outcome_inquiries.sql", import.meta.url), "utf8"));
+    this.sqlite.exec(readFileSync(new URL("../drizzle/0011_handoff_confirmation_inquiries.sql", import.meta.url), "utf8"));
   }
   close() { this.sqlite.close(); }
 }
@@ -355,6 +357,45 @@ describe("Grapevine Care server invariants", () => {
     expect(current.shifts.find((shift) => shift.id === "shift-wed-pm")?.visit_status).toBe("in_progress");
     expect(current.care_team_day?.advance_gate.allowed).toBe(true);
     expect(current.visit_events.find((event) => event.event_type === "shift_checked_in")?.detail).toContain("coordinator verified");
+
+    await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" });
+    current = await state(runA);
+    expect(current.care_team_day?.step).toBe(4);
+    expect(current.care_team_day?.advance_gate.blockers[0]).toContain("visit-update request");
+    const outcomeResponse = await call(runA, "/api/care/team-inquiries", { method: "POST", body: JSON.stringify({ resident_ref: "Rose", caregiver_id: "caregiver-jordan", prompt: "Please submit completed tasks, bounded observations, and unresolved items from Rose's visit.", idempotency_key: "jordan-visit-outcome-001" }) });
+    expect(outcomeResponse.status).toBe(200);
+    const outcome = await outcomeResponse.json() as { inquiry: { id: string; inquiry_type: string; status: string } };
+    expect(outcome.inquiry).toMatchObject({ inquiry_type: "visit_outcome", status: "awaiting_coordinator_approval" });
+    await call(runA, `/api/care/team-inquiries/${outcome.inquiry.id}/resolve`, { method: "POST", body: JSON.stringify({ decision: "send_in_demo" }) });
+    current = await state(runA);
+    expect(current.care_team_day?.inquiries.find((item) => item.inquiry_type === "visit_outcome")).toMatchObject({ status: "response_received", response_code: "visit_record_submitted", response_detail: expect.stringContaining("Can you verify") });
+    expect(current.shifts.find((shift) => shift.id === "shift-wed-pm")?.visit_status).toBe("in_progress");
+    expect((await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" })).status).toBe(409);
+    await call(runA, `/api/care/team-inquiries/${outcome.inquiry.id}/close`, { method: "POST", body: "{}" });
+    current = await state(runA);
+    expect(current.shifts.find((shift) => shift.id === "shift-wed-pm")).toMatchObject({ visit_status: "completed", handoff_status: "ready" });
+    expect(current.care_team_day?.advance_gate.allowed).toBe(true);
+    expect(current.visit_events.find((event) => event.event_type === "caregiver_observation")?.detail).toContain("No cause or clinical meaning was inferred");
+
+    await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" });
+    current = await state(runA);
+    expect(current.care_team_day?.step).toBe(5);
+    const finalContext = await (await call(runA, "/api/care/shift-context", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm" }) })).json() as { schedule_snapshot_id: string };
+    const handoffDraft = await (await call(runA, "/api/care/shift-handoffs", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm", to_caregiver_id: "caregiver-luis", schedule_snapshot_id: finalContext.schedule_snapshot_id, reason: "Preserve verified visit evidence and unresolved items for Luis.", idempotency_key: "team-day-handoff-001" }) })).json() as { handoff: { id: string } };
+    const approval = await (await call(runA, "/api/care/team-inquiries", { method: "POST", body: JSON.stringify({ resident_ref: "Rose", caregiver_id: "caregiver-jordan", prompt: "Please review the prepared handoff and confirm that it accurately preserves the visit record.", idempotency_key: "jordan-handoff-approval-001" }) })).json() as { inquiry: { id: string; inquiry_type: string } };
+    expect(approval.inquiry.inquiry_type).toBe("handoff_approval");
+    await call(runA, `/api/care/team-inquiries/${approval.inquiry.id}/resolve`, { method: "POST", body: JSON.stringify({ decision: "send_in_demo" }) });
+    expect((await state(runA)).shift_handoffs.find((handoff) => handoff.id === handoffDraft.handoff.id)?.status).toBe("awaiting_caregiver_approval");
+    await call(runA, `/api/care/team-inquiries/${approval.inquiry.id}/close`, { method: "POST", body: "{}" });
+    expect((await state(runA)).shift_handoffs.find((handoff) => handoff.id === handoffDraft.handoff.id)?.status).toBe("available_to_next_caregiver");
+    const receipt = await (await call(runA, "/api/care/team-inquiries", { method: "POST", body: JSON.stringify({ resident_ref: "Rose", caregiver_id: "caregiver-luis", prompt: "Please confirm that you received Rose's approved handoff and have the context for the next visit.", idempotency_key: "luis-handoff-receipt-001" }) })).json() as { inquiry: { id: string; inquiry_type: string } };
+    expect(receipt.inquiry.inquiry_type).toBe("handoff_receipt");
+    await call(runA, `/api/care/team-inquiries/${receipt.inquiry.id}/resolve`, { method: "POST", body: JSON.stringify({ decision: "send_in_demo" }) });
+    await call(runA, `/api/care/team-inquiries/${receipt.inquiry.id}/close`, { method: "POST", body: "{}" });
+    current = await state(runA);
+    expect(current.shifts.find((shift) => shift.id === "shift-wed-pm")?.handoff_status).toBe("acknowledged");
+    expect(current.handoff_acknowledgements).toHaveLength(1);
+    expect(current.care_team_day?.advance_gate.allowed).toBe(true);
   });
 
   it("rejects unsafe channels and oversized bodies", async () => {

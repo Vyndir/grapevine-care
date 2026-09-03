@@ -227,6 +227,26 @@ describe("Grapevine Care", () => {
     await waitFor(() => expect(prepareTeamInquiry).toHaveBeenCalledWith(expect.objectContaining({ resident_ref: "Rose", caregiver_id: "caregiver-jordan" })));
   });
 
+  it("keeps the judge in the coordinator role for Jordan's visit record", async () => {
+    const prepareTeamInquiry = vi.fn(async () => ({ inquiry: {} as never, approval_required: true as const, external_side_effect: false as const }));
+    const state: CareState = {
+      ...structuredClone(baseState),
+      resident: { ...baseState.resident, scenario: "care_team_day", simulated_time: "2026-09-02T19:35:00-04:00" },
+      shifts: baseState.shifts.map((shift) => shift.id === "shift-wed-pm" ? { ...shift, assigned_caregiver_id: "caregiver-jordan", coverage_status: "assigned", visit_status: "in_progress" } : shift),
+      care_team_day: {
+        step: 4, step_label: "Visit completion", next_event_label: "Continuity handoff",
+        timeline: [{ step: 3, time: "5:00 PM", label: "Replacement visit" }, { step: 4, time: "7:35 PM", label: "Visit completion" }, { step: 5, time: "8:00 PM", label: "Continuity handoff" }],
+        residents: [{ id: "rose-demo", display_name: "Rose", age: 79, care_plan_version: "v4", support_setting: "Independent living", headline: "Visit record needed", status: "attention", preferences: ["Call before visiting"], context: ["Mild memory difficulties"] }],
+        attention_queue: [{ id: "attention-rose-complete", resident_id: "rose-demo", resident_name: "Rose", state: "attention_now", attention_reason: "Request Jordan’s visit outcome before preparing the handoff", deadline: "Before 8:00 PM handoff", source: "Visit record", policy_basis: "Verified continuity evidence", known: ["Jordan’s visit is active"], unknown: ["What Jordan observed and completed"], human_owner: "Care coordinator and Jordan" }],
+        orientation_packets: [], inquiries: [], advance_gate: { allowed: false, blockers: ["Prepare a bounded visit-update request for Jordan."], requirement: "Address the current block first." }
+      }
+    };
+    render(<CareTeamDayView state={state} actions={{ prepareTeamInquiry } as unknown as CareActions} busy={false} webmcp={{ supported: true, registered: true, error: null, count: 4, availableNames: ["prepare_team_inquiry"] }} onMessage={() => undefined} />);
+    expect(screen.queryByRole("button", { name: /I’m Jordan.*complete/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Prepare visit-update request to Jordan/i }));
+    await waitFor(() => expect(prepareTeamInquiry).toHaveBeenCalledWith(expect.objectContaining({ resident_ref: "Rose", caregiver_id: "caregiver-jordan", idempotency_key: "jordan-visit-outcome-v1" })));
+  });
+
   it("keeps the technical safety contract available without competing with the care workflow", async () => {
     render(<App />);
     await screen.findAllByText("9:15 AM");

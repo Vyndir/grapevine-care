@@ -69,8 +69,11 @@ Ask:
 
 Continue through the 5:00 PM visit, 7:35 PM completion, and 8:00 PM handoff. At
 5:00 PM, the judge stays in the coordinator role: prepare and send Jordan's readiness
-check-in, review her own acknowledgement, then verify and clear her. Observations remain bounded; Jordan approves
-the handoff; Luis acknowledges it.
+check-in, review her own acknowledgement, then verify and clear her. Observations remain bounded. At handoff, the coordinator requests and verifies Jordan's approval, then requests and verifies Luis's receipt.
+
+At 7:35 PM, keep the same coordinator lens: prepare and send the visit-update
+request, review Jordan's submitted completed tasks, direct observation, and
+unresolved item, then verify the record before handoff preparation becomes valid.
 
 ## Failure conditions judges should try
 
