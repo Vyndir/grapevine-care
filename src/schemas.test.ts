@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { parseArgs, prepareCaregiverCheckInArgsSchema, prepareCareTeamReviewArgsSchema, prepareShiftCoverageArgsSchema, prepareShiftHandoffArgsSchema } from "./schemas";
+import { getShiftContextArgsSchema, parseArgs, prepareCaregiverCheckInArgsSchema, prepareCareTeamReviewArgsSchema, prepareShiftCoverageArgsSchema, prepareShiftHandoffArgsSchema } from "./schemas";
 
 describe("care tool inputs", () => {
+  it("lets natural-language coverage work bootstrap without an opaque shift ID", () => {
+    expect(parseArgs(getShiftContextArgsSchema, {})).toEqual({});
+    expect(parseArgs(getShiftContextArgsSchema, { shift_id: "shift-wed-pm" }).shift_id).toBe("shift-wed-pm");
+  });
+
   it("requires a bounded reason and idempotency key for staged outreach", () => {
     expect(() => parseArgs(prepareCaregiverCheckInArgsSchema, { resident_id: "rose-demo", channel: "call", reason: "short", evidence_snapshot_id: "snapshot-current-001", idempotency_key: "tiny" })).toThrow();
     expect(parseArgs(prepareCaregiverCheckInArgsSchema, { resident_id: "rose-demo", channel: "visit", reason: "Review the missed confirmation with current evidence.", evidence_snapshot_id: "snapshot-current-001", idempotency_key: "scenario-missed-visit" }).channel).toBe("visit");

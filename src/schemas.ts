@@ -59,7 +59,9 @@ export const prepareCareTeamReviewArgsSchema = z.object({
   evidence_snapshot_id: z.string().check(z.trim(), z.minLength(12), z.maxLength(96), z.describe("Current snapshot returned by get_care_evidence.")),
   idempotency_key: z.string().check(z.trim(), z.minLength(8), z.maxLength(80), z.describe("Unique key preventing duplicate handoffs."))
 });
-export const getShiftContextArgsSchema = z.object({ shift_id: shiftIdSchema });
+export const getShiftContextArgsSchema = z.object({
+  shift_id: z.optional(shiftIdSchema.check(z.describe("Optional shift identifier returned by a prior tool. Omit it to resolve the single active disrupted shift in the current caregiver workflow.")))
+});
 export const getCoverageCandidatesArgsSchema = z.object({ shift_id: shiftIdSchema });
 export const prepareShiftCoverageArgsSchema = z.object({
   shift_id: shiftIdSchema,

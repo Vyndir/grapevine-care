@@ -43,12 +43,15 @@ hosts the project.
 Without WebMCP, an agent would scrape cards, infer status colors, and miss the
 relationship between schedule, availability, readiness, resident context,
 recent history, visit evidence, and the next shift. Grapevine exposes those
-systems as one bounded conversation. Its capability set changes with the job:
-coverage tools disappear after scheduler approval, briefing tools appear only
-for an assignment, and handoff preparation appears only after visit completion.
-The server rejects stale schedule/evidence snapshots and ineligible candidates.
-Human-only controls own assignment, visit acknowledgement, handoff release, and
-recipient acknowledgement.
+systems as one bounded conversation. Four safe caregiver-context reads remain
+available so natural questions can use WebMCP without first scraping the page.
+The opening `get_shift_context({})` call discovers the active disrupted shift
+without requiring the user to know an internal ID. Consequential tools change
+with the job: coverage tools disappear after scheduler approval, briefing tools
+appear only for an assignment, and handoff preparation appears only after visit
+completion. The server rejects stale schedule/evidence snapshots and ineligible
+candidates. Human-only controls own assignment, visit acknowledgement, handoff
+release, and recipient acknowledgement.
 
 ## Challenges
 
@@ -104,3 +107,29 @@ architecture if the concept is appropriate to pursue.
 - Live Sites URL: https://grapevine-care.miles-g.chatgpt.site/
 - Public repository URL: https://github.com/Vyndir/grapevine-care
 - Public YouTube demo: _record and upload using `docs/DEMO_SCRIPT.md`_
+
+## Testing instructions for judges
+
+Use the latest ChatGPT desktop app and open the live URL in ChatGPT's built-in
+browser. In Browser settings → Permissions, ensure **Enable site tools** is on;
+Site Tools also require a supported account and selected model. Keep the page
+open and use the address-bar Site Tools menu to inspect the registered tools.
+
+The default call-out initially exposes six tools: four persistent safe reads
+(`get_resident_context`, `get_care_story`, `get_care_evidence`,
+`get_shift_context`) plus `get_coverage_candidates` and
+`prepare_shift_coverage`. The interface's **Agent tools** chip shows the same
+set. Seventeen tools exist across the full app; the smaller visible set is an
+intentional workflow boundary.
+
+Suggested prompt:
+
+> Rose's 5 PM caregiver called out. Determine who is eligible to cover the
+> shift, explain every candidate against the explicit constraints, and prepare
+> the eligible option for scheduler review. Do not assign anyone or use an
+> opaque score.
+
+The first call should be `get_shift_context({})`; no internal shift ID is
+required. Approve Jordan in the visible scheduler drawer, then inspect Site
+Tools again to confirm coverage actions were replaced by assignment-bound
+briefing tools while safe context reads remained available.

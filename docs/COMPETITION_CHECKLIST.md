@@ -15,6 +15,9 @@ Verified against the official challenge and Devpost rules on August 31, 2026.
 - [x] Resident evidence-resolution loop with human-only response controls
 - [x] Evidence-snapshot binding and stale-state rejection
 - [x] State-dependent WebMCP capability registration
+- [x] Natural-language workflow bootstrap with optional shift ID
+- [x] Persistent safe caregiver-context reads with state-dependent actions
+- [x] Visible active-tool diagnostic on the primary caregiver workspace
 - [x] Structured evidence chain of custody and safe device diagnostics
 - [x] Fictional Rose profile, personal baseline, and care-team-authored monitoring plan
 - [x] Deterministic compressed 72-hour care episode
@@ -36,7 +39,7 @@ Verified against the official challenge and Devpost rules on August 31, 2026.
 
 ## Required before final Devpost submission
 
-- [ ] Deploy the new caregiver-continuity build to the live Sites URL
+- [x] Deploy the caregiver-continuity build to the live Sites URL
 - [x] Publish this healthcare adaptation in a public repository
 - [x] Confirm the joint MIT license is visible at the repository root/about area
 - [ ] Record and publicly upload the demo video to YouTube with audio

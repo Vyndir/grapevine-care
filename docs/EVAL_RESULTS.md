@@ -8,12 +8,14 @@ Command:
 pnpm run test
 ```
 
-Result: **3 test files passed, 26 tests passed, 0 failed.**
+Result: **3 test files passed, 27 tests passed, 0 failed.**
 
 ## Recorded coverage
 
 | Evaluation area | Result | Evidence |
 | --- | --- | --- |
+| Active disrupted shift is discoverable without an opaque ID | Pass | Schema bootstrap and server continuity-loop tests |
+| Initial caregiver state retains four safe reads plus two coverage tools | Pass | Frontend dynamic-registration test |
 | Full caregiver call-out loop reaches recipient acknowledgement | Pass | Server continuity-loop test |
 | Exactly one caregiver passes all eight operational constraints | Pass | Server candidate-evaluation test |
 | Ineligible candidate is rejected with deterministic reasons | Pass | Server constraint-rejection test |

@@ -228,8 +228,10 @@ describe("Grapevine Care server invariants", () => {
 
   it("recovers a caregiver call-out through scheduler approval, visit, and acknowledged handoff", async () => {
     await scenario(runA, "coverage_callout");
-    const contextResponse = await call(runA, "/api/care/shift-context", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm" }) });
-    const context = await contextResponse.json() as { schedule_snapshot_id: string };
+    const contextResponse = await call(runA, "/api/care/shift-context", { method: "POST", body: JSON.stringify({}) });
+    const context = await contextResponse.json() as { shift: { id: string }; resident_id?: string; schedule_snapshot_id: string; resolved_from: string };
+    expect(context.shift.id).toBe("shift-wed-pm");
+    expect(context.resolved_from).toBe("active_disrupted_shift");
     const candidateResponse = await call(runA, "/api/care/coverage-candidates", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm" }) });
     const candidateResult = await candidateResponse.json() as { candidates: Array<{ caregiver: { id: string }; eligible: boolean; checks: unknown[] }> };
     expect(candidateResult.candidates.filter((candidate) => candidate.eligible).map((candidate) => candidate.caregiver.id)).toEqual(["caregiver-jordan"]);

@@ -1,8 +1,9 @@
-import { CheckCircleIcon, ShieldCheckIcon, WarningCircleIcon } from "@phosphor-icons/react";
+import { CheckCircleIcon, RadioIcon, ShieldCheckIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { CoverageCandidate, CareState } from "./schemas";
 import type { CareActions } from "./useCare";
+import type { WebMCPToolsState } from "./useWebMCPTools";
 
 type Tab = "today" | "shift" | "handoff";
 
@@ -11,8 +12,8 @@ function timeLabel(value: string, timeZone: string) {
   return Number.isFinite(date.getTime()) ? date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone }) : value;
 }
 
-export function CoverageCaregiverView({ state, actions, busy, onMessage, story, plan }: { state: CareState; actions: CareActions; busy: boolean; onMessage(message: string): void; story: ReactNode; plan: ReactNode; }) {
-  const shift = state.shifts.find((item) => item.id === "shift-wed-pm")!;
+export function CoverageCaregiverView({ state, actions, busy, onMessage, story, plan, webmcp }: { state: CareState; actions: CareActions; busy: boolean; onMessage(message: string): void; story: ReactNode; plan: ReactNode; webmcp: WebMCPToolsState; }) {
+  const shift = state.shifts.find((item) => Boolean(item.disruption_reason)) ?? state.shifts[0]!;
   const proposal = state.coverage_proposals.find((item) => item.shift_id === shift.id && item.status === "awaiting_scheduler_approval");
   const handoff = state.shift_handoffs.find((item) => item.shift_id === shift.id);
   const assigned = state.caregivers.find((item) => item.id === shift.assigned_caregiver_id);
@@ -50,9 +51,10 @@ export function CoverageCaregiverView({ state, actions, busy, onMessage, story, 
     ["Disruption", true], ["Constraints", candidates.length > 0 || shift.coverage_status !== "coverage_needed"], ["Approval", shift.coverage_status === "assigned"], ["Brief", Boolean(assigned)], ["Visit", shift.visit_status === "completed"], ["Handoff", shift.handoff_status === "acknowledged"]
   ] as const;
   const activeIndex = steps.findIndex(([, complete]) => !complete);
+  const toolStatus = webmcp.error ? "needs attention" : webmcp.registered ? `${webmcp.count} active` : `${webmcp.availableNames.length} available`;
 
   return <main className="continuity-layout">
-    <section className="continuity-hero"><div><p className="eyebrow">Caregiver continuity workspace · Wednesday, September 2</p><h1>Keep Rose’s care moving—without losing context.</h1><p>See what changed, recover an uncovered shift, brief the caregiver who steps in, and preserve what the next person needs.</p></div><span className="severity-badge attention"><i /> Live call-out</span></section>
+    <section className="continuity-hero"><div><p className="eyebrow">Caregiver continuity workspace · Wednesday, September 2</p><h1>Keep Rose’s care moving—without losing context.</h1><p>See what changed, recover an uncovered shift, brief the caregiver who steps in, and preserve what the next person needs.</p></div><div className="continuity-statuses"><span className="severity-badge attention"><i /> Live call-out</span><details className="agent-tool-status"><summary><RadioIcon weight="fill" /> Agent tools · {toolStatus}</summary><div><strong>Current WebMCP capabilities</strong><ul>{webmcp.availableNames.map((name) => <li key={name}><code>{name}</code></li>)}</ul><p>Safe caregiver context stays available. Consequential preparation tools change with workflow state.</p></div></details></div></section>
     <section className="continuity-loop" aria-label="Caregiver continuity loop">{steps.map(([label, done], index) => <div className={done ? "done" : index === activeIndex ? "current" : ""} key={label}><i>{done ? "✓" : index + 1}</i><span>{label}</span></div>)}</section>
     <nav className="cockpit-tabs continuity-tabs" aria-label="Caregiver workflow views">{(["today", "shift", "handoff"] as Tab[]).map((item) => <button key={item} className={tab === item ? "active" : ""} type="button" onClick={() => setTab(item)}>{item === "shift" ? "My shift" : item === "handoff" ? "Handoff" : "Today"}</button>)}</nav>
     {tab === "today" && <div className="continuity-grid"><section className="continuity-card callout-card"><header><span className="attention-icon"><WarningCircleIcon weight="fill" /></span><div><p className="eyebrow">2:15 PM · schedule disruption</p><h2>Maya called out for Rose’s 5:00–8:00 PM visit.</h2><p>The shift has no approved caregiver. Availability is only the first check; readiness, conflicts, travel, and workload still matter.</p></div></header><dl><div><dt>Resident</dt><dd>Rose · home visit</dd></div><div><dt>Required role</dt><dd>Home care aide</dd></div><div><dt>Must know</dt><dd>Rose orientation + Care Plan v4</dd></div><div><dt>Authority</dt><dd>Scheduler approves assignment</dd></div></dl></section><aside className="continuity-card next-step"><p className="eyebrow">Agent-assisted next step</p><h2>{proposal ? "Recommendation ready for you" : assigned ? `${assigned.display_name} is assigned` : "Recover coverage safely"}</h2><p>{proposal ? "Review the constraint evidence before changing the schedule." : assigned ? "Jordan can now review what changed since her last visit." : "The agent can compare candidates and prepare a recommendation. It cannot assign anyone."}</p>{!proposal && !assigned && <button type="button" disabled={busy} onClick={() => void evaluateCoverage()}>{candidates.length ? "Refresh constraints" : "Evaluate four caregivers"}</button>}{candidates.length > 0 && !proposal && !assigned && <button type="button" className="secondary" disabled={busy} onClick={() => void stageCoverage()}>Prepare Jordan for review</button>}</aside></div>}

@@ -7,7 +7,7 @@ Fictional device adapters
   └─ emit scoped signals + provenance
        └─ D1 evidence model
             ├─ Resident UI: local confirmation + bounded self-report
-            ├─ Caregiver UI: Today + Schedule + My Shift + Handoffs + Story + Care Plan
+            ├─ Caregiver UI: Today → My Shift → Handoff, with contextual disclosures
             └─ WebMCP: state-dependent evidence and preparation tools
 
 Medication release: deterministic device controller only
@@ -54,7 +54,7 @@ The primary state machine is:
 
 ```text
 coverage_needed
-  → get_shift_context (schedule snapshot)
+  → get_shift_context({}) (discover active shift + schedule snapshot)
   → get_coverage_candidates (eight deterministic constraints)
   → prepare_shift_coverage
   → awaiting_scheduler_approval
@@ -136,9 +136,10 @@ prompt-only instruction.
 ## Tool lifecycle
 
 Each tool is registered with an `AbortController`, bounded JSON Schema, and
-annotations. The page aborts registrations when the workflow changes and
-registers only capabilities valid for the new state. All device-derived outputs
-use `untrustedContentHint: true`.
+annotations. Four non-consequential caregiver-context tools remain available
+throughout the call-out workflow so natural questions do not fall back to DOM
+inspection. The page aborts and replaces consequential registrations when the
+workflow changes. All device-derived outputs use `untrustedContentHint: true`.
 
 `prepare_resident_check_in` creates a visible human-only card;
 `request_device_health_snapshot` records only non-clinical diagnostics; and

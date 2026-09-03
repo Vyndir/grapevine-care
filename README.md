@@ -27,13 +27,13 @@ emergency service, or substitute for professional care.
 Caregiver work spans a schedule, staff readiness, a resident's preferences and
 care plan, recent evidence, a live visit, and the next shift. A static chatbot
 does not have trustworthy access to that state. Grapevine exposes a small,
-state-dependent capability set from the same interface people use.
+goal-oriented capability set from the same interface people use.
 
 The six caregiver-continuity tools are:
 
 | Tool | Purpose | Enforced boundary |
 | --- | --- | --- |
-| `get_shift_context` | Read assignment, disruption, visit, handoff, and version-bound schedule context | Read only; creates a snapshot for safe follow-on preparation |
+| `get_shift_context` | Discover the active disrupted shift without requiring an internal ID, then read assignment, disruption, visit, handoff, and version-bound schedule context | Read only; creates a snapshot for safe follow-on preparation |
 | `get_coverage_candidates` | Check availability, qualification, training, Rose orientation, care-plan acknowledgement, conflicts, travel, and weekly hours | Deterministic checks; no sensitive ranking or opaque score |
 | `prepare_shift_coverage` | Stage one eligible coverage recommendation | Scheduler must approve before assignment changes |
 | `get_changes_since_last_shift` | Catch the assigned caregiver up on meaningful changes | Source-bounded; no clinical inference |
@@ -45,11 +45,17 @@ care-team review, and device-adapter demonstrations. Operational shift handoffs
 are deliberately separate from `prepare_care_team_review`, which now stages
 nurse review only. See [the tool matrix](docs/WEBMCP_EVALUATION.md).
 
-Tools appear only when useful. An uncovered shift exposes coverage tools. A
-pending scheduler decision removes them. Assignment exposes briefing tools.
-Completion exposes handoff preparation. The final acknowledgement remains a
-human-only UI action. This prevents redundant capabilities and makes workflow
-order observable to judges.
+Four safe context tools remain discoverable throughout the caregiver call-out
+workflow: `get_resident_context`, `get_care_story`, `get_care_evidence`, and
+`get_shift_context`. Consequential tools still appear only when useful. An
+uncovered shift adds coverage evaluation and preparation; assignment replaces
+those with briefing tools; completion adds handoff preparation. Final
+acknowledgement remains a human-only UI action. The main workspace shows the
+current capability set so judges can see that this lifecycle is intentional.
+
+The bootstrap call accepts `get_shift_context({})`. Grapevine resolves the one
+active disrupted shift and returns its opaque IDs for later calls, so a person
+can simply ask, “Who can cover Rose tonight?”
 
 ## Human authority and reliability
 
@@ -76,8 +82,13 @@ order observable to judges.
 
 ## Three-minute judge path
 
-1. Open the public site; **Caregiver call-out** is the default scenario.
-2. Ask the agent to inspect `shift-wed-pm`, explain eligible and excluded
+Use the latest ChatGPT desktop app's built-in browser with Site Tools enabled
+under Browser → Permissions and a supported account/model. Open the address-bar
+Site Tools menu to inspect the capabilities currently offered by the page.
+
+1. Open the public site; **Caregiver call-out** is the default scenario. The
+   page should show **Agent tools · 6 active**.
+2. Ask the agent to inspect Rose's uncovered evening shift, explain eligible and excluded
    candidates, and prepare the safest coverage option without assigning anyone.
 3. Show the scheduler drawer and approve Jordan.
 4. Open **My shift** and show “Since you were last here,” expectations, and

@@ -47,9 +47,9 @@ export function expectedToolNames(state: CareState | null, workspace: WebMCPWork
   if (!state) return [];
   if (state.resident.scenario === "coverage_callout") {
     if (workspace === "resident") return ["get_care_overview", "get_medication_schedule", "get_resident_context"];
-    const shift = state.shifts.find((item) => item.id === "shift-wed-pm") ?? state.shifts[0];
+    const shift = state.shifts.find((item) => Boolean(item.disruption_reason)) ?? state.shifts[0];
     if (!shift) return [];
-    const names = ["get_shift_context"];
+    const names = ["get_resident_context", "get_care_story", "get_care_evidence", "get_shift_context"];
     if (shift.coverage_status === "coverage_needed") names.push("get_coverage_candidates", "prepare_shift_coverage");
     if (shift.assigned_caregiver_id && shift.visit_status !== "completed") names.push("get_changes_since_last_shift", "get_shift_brief");
     if (shift.visit_status === "completed" && shift.handoff_status === "ready") names.push("prepare_shift_handoff");
@@ -179,7 +179,7 @@ export function useWebMCPTools(actions: CareActions, state: CareState | null, wo
     } satisfies WebMCPTool,
     shiftContext: {
       name: "get_shift_context", title: "Get shift context",
-      description: "Read one caregiver shift, its assignment, disruption, visit and handoff state, and create a version-bound schedule snapshot for safe follow-on preparation.",
+      description: "Start the caregiver coverage workflow by reading the active disrupted shift and creating a version-bound schedule snapshot. Omit shift_id when the user refers naturally to Rose's current or uncovered shift; use an explicit ID only when a prior tool returned it.",
       inputSchema: toolInputSchemas.getShiftContext, annotations: { ...baseAnnotations, readOnlyHint: true },
       async execute(args: unknown) { return actions.getShiftContext(parseArgs(getShiftContextArgsSchema, args)); }
     } satisfies WebMCPTool,

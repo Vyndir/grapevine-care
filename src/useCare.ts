@@ -34,7 +34,7 @@ export type CareActions = {
   prepareCareTeamReview(input: { resident_id: string; review_type: CareTeamHandoff["review_type"]; period_hours: 24 | 72; reason: string; evidence_snapshot_id: string; idempotency_key: string; }): Promise<{ handoff: CareTeamHandoff; approval_required: true; external_side_effect: false; }>;
   resolveAction(actionId: string, resolution: "approved_in_demo" | "dismissed"): Promise<CareState>;
   resolveCareTeamReview(handoffId: string, resolution: "approved_in_demo" | "dismissed"): Promise<CareState>;
-  getShiftContext(input: { shift_id: string; }): Promise<Record<string, unknown>>;
+  getShiftContext(input?: { shift_id?: string; }): Promise<Record<string, unknown>>;
   getCoverageCandidates(input: { shift_id: string; }): Promise<{ fictional: true; shift_id: string; candidates: CoverageCandidate[]; method: string; }>;
   prepareShiftCoverage(input: { shift_id: string; caregiver_id: string; schedule_snapshot_id: string; reason: string; idempotency_key: string; }): Promise<{ proposal: CoverageProposal; approval_required: true; external_side_effect: false; duplicate_prevented: boolean; }>;
   resolveShiftCoverage(proposalId: string, resolution: "approved_in_demo" | "dismissed"): Promise<CareState>;
@@ -141,7 +141,7 @@ export function useCare() {
     } finally { setBusy(false); }
   }, [commit]);
 
-  const getShiftContext = useCallback((input: { shift_id: string; }) =>
+  const getShiftContext = useCallback((input: { shift_id?: string; } = {}) =>
     api<Record<string, unknown>>("/api/care/shift-context", demoRunRef.current.id, { method: "POST", body: JSON.stringify(input) }), []);
 
   const getCoverageCandidates = useCallback((input: { shift_id: string; }) =>

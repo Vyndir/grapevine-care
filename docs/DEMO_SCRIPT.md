@@ -4,6 +4,9 @@
 
 Open the public site on the default **Caregiver call-out** scenario.
 
+Point out the **Agent tools · 6 active** chip. The initial surface combines four
+safe context reads with two workflow-specific coverage tools.
+
 “It is 2:15 PM. Maya just called out for Rose's 5:00 PM visit. Care does not
 pause, and the replacement caregiver cannot arrive without the context the shift
 requires.”
@@ -20,7 +23,7 @@ Ask ChatGPT:
 > Do not assign anyone, use an opaque score, or infer suitability from sensitive
 > traits.
 
-Show `get_shift_context`, `get_coverage_candidates`, and
+Show `get_shift_context({})`, `get_coverage_candidates`, and
 `prepare_shift_coverage`. Point out that Jordan is the only eligible option;
 Maya is unavailable, Luis lacks a feasible travel window, and Elena lacks Rose
 orientation and Care Plan v4 acknowledgement.
@@ -33,8 +36,8 @@ The scheduler drawer opens. Show:
 - the 39/40-hour workload tradeoff is visible;
 - no assignment changed and no caregiver was contacted.
 
-Approve Jordan in the human-only UI. The coverage tools disappear; briefing
-tools replace them.
+Approve Jordan in the human-only UI. The coverage tools disappear; safe context
+reads remain and assignment-bound briefing tools replace the coverage actions.
 
 ## 1:05–1:38 — “Since you were last here”
 
@@ -67,7 +70,7 @@ visit was complete.
 ## 2:05–2:31 — Context reaches the next caregiver
 
 Prepare the handoff to Luis. Show that the outgoing caregiver must approve and
-Luis has no access to the draft. Approve as Jordan, open **Handoffs**, and
+Luis has no access to the draft. Approve as Jordan, open **Handoff**, and
 acknowledge as Luis.
 
 The loop now reads entirely complete:
@@ -91,7 +94,8 @@ the shift does.”
 ## Recording checklist
 
 - Keep the final video under three minutes.
-- Show a real WebMCP call within the first 30 seconds.
+- Show a real WebMCP call within the first 30 seconds and use the Site Tools
+  activity UI to prove invocation.
 - Record at 1080p with readable browser zoom and clear audio.
 - Show the deployed URL, real tool calls, and both human approval gates.
 - Use no protected health information, private data, third-party music, or

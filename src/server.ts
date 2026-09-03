@@ -354,17 +354,24 @@ async function createShiftContext(db: D1Database, runId: string, body: Record<st
   const parsed = getShiftContextArgsSchema.safeParse(body);
   if (!parsed.success) return json({ error: "Invalid shift context request." }, 400);
   const state = await loadCareState(db, runId);
-  const shift = state?.shifts.find((item) => item.id === parsed.data.shift_id);
+  if (!state) return json({ error: "Care workspace not found." }, 404);
+  const disruptedShifts = state.shifts.filter((item) => Boolean(item.disruption_reason));
+  if (!parsed.data.shift_id && disruptedShifts.length !== 1) return json({ error: "The current workflow does not resolve to exactly one disrupted shift. Provide shift_id from a prior tool response.", requires_shift_id: true }, 409);
+  const shift = parsed.data.shift_id
+    ? state.shifts.find((item) => item.id === parsed.data.shift_id)
+    : disruptedShifts[0];
   if (!state || !shift) return json({ error: "Shift not found." }, 404);
   const snapshotId = `sched_${crypto.randomUUID()}`;
   await db.prepare("INSERT INTO care_demo_schedule_snapshots (run_id, snapshot_id, shift_id, shift_version, created_at) VALUES (?, ?, ?, ?, ?)").bind(runId, snapshotId, shift.id, shift.version, state.resident.simulated_time).run();
   const findCaregiver = (id: string | null) => state.caregivers.find((item) => item.id === id) ?? null;
   return json({
     fictional: true,
+    resident_id: state.resident.id,
     shift,
     original_caregiver: findCaregiver(shift.original_caregiver_id),
     assigned_caregiver: findCaregiver(shift.assigned_caregiver_id),
     next_caregiver: findCaregiver(shift.next_caregiver_id),
+    resolved_from: parsed.data.shift_id ? "explicit_shift_id" : "active_disrupted_shift",
     schedule_snapshot_id: snapshotId,
     continuity_history: state.shifts.filter((item) => item.id !== shift.id).slice(-3),
     unresolved_items: state.care_story.unresolved,

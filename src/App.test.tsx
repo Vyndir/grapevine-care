@@ -66,6 +66,17 @@ function installFetch() {
       if (body.scenario === "care_story") state = { ...state, evidence_version: 1, resident: { ...state.resident, scenario: "care_story", severity: "attention", simulated_time: "2026-09-02T09:42:00-04:00" }, doses: state.doses.map((dose, index) => index === 0 ? { ...dose, status: "missed" } : dose), resident_check_ins: [{ id: "story-check-in", resident_id: "rose-demo", prompt: "Are you okay?", status: "responded", response_code: "im_okay", evidence_snapshot_id: "historical-story-snapshot", idempotency_key: "historical-story-check-in", created_at: "2026-09-01T09:12:00-04:00", responded_at: "2026-09-01T09:14:00-04:00" }], actions: [], handoffs: [], care_story: { ...state.care_story, horizon_hours: 72, starts_at: "2026-08-31T07:00:00-04:00", ends_at: "2026-09-02T09:42:00-04:00", routine_confirmations: 3, unconfirmed_windows: 2, resident_check_ins: 1, routine_activity_signals: 2, summary: "Rose’s routine was largely consistent across three days. Two care-plan signals now require human review.", unresolved: ["Whether either unconfirmed window reflects medication ingestion"], baseline_comparisons: [{ signal: "Morning activity", baseline: "Usually begins by 7:30 AM", observed: "First movement at 9:31 AM", interpretation: "Person-specific change; cause unknown", evidence_status: "changed" }] }, events: [{ ...state.events[0], id: "story-current", event_type: "medication_window_unconfirmed", severity: "attention", summary: "Second monitoring-plan signal in 72 hours", detail: "A second morning medication window lacks confirmation." }, ...state.events] };
       return Response.json({ state });
     }
+    if (url === "/api/care/shift-context") {
+      const shift = state.shifts.find((candidate) => candidate.disruption_reason);
+      if (!shift || (body.shift_id && body.shift_id !== shift.id)) return Response.json({ error: "Shift not found" }, { status: 404 });
+      return Response.json({
+        fictional: true,
+        resident_id: shift.resident_id,
+        shift,
+        schedule_snapshot_id: "schedule-snapshot-bootstrap",
+        resolved_from: body.shift_id ? "explicit_shift_id" : "active_disrupted_shift"
+      });
+    }
     if (url === "/api/care/evidence-snapshot") return Response.json({ fictional: true, evidence_snapshot_id: `snapshot-test-version-${state.evidence_version}`, evidence_version: state.evidence_version, observed_at: state.resident.simulated_time, events: state.events.slice(0, 5), uncertainty: "Medication removal was not confirmed. Ingestion and welfare remain unknown.", next_step: "Use an available capability." });
     if (url === "/api/care/resident-check-ins") {
       const checkIn = { id: "resident-check-in-1", resident_id: "rose-demo", prompt: String(body.prompt), status: "awaiting_resident" as const, response_code: null, evidence_snapshot_id: String(body.evidence_snapshot_id), idempotency_key: String(body.idempotency_key), created_at: state.resident.simulated_time, responded_at: null };
@@ -109,7 +120,14 @@ describe("Grapevine Care", () => {
     expect(screen.getByRole("button", { name: "Caregiver workspace" })).toHaveClass("active");
     expect(within(screen.getByRole("navigation", { name: "Caregiver workflow views" })).getAllByRole("button").map((button) => button.textContent)).toEqual(["Today", "My shift", "Handoff"]);
     expect(screen.getByRole("combobox", { name: "Demo scenario" })).toHaveValue("coverage_callout");
-    await waitFor(() => expect(tools.has("get_shift_context") && tools.has("get_coverage_candidates") && tools.has("prepare_shift_coverage")).toBe(true));
+    await waitFor(() => expect([...tools.keys()].sort()).toEqual(["get_care_evidence", "get_care_story", "get_coverage_candidates", "get_resident_context", "get_shift_context", "prepare_shift_coverage"]));
+    expect(screen.getByText("Agent tools · 6 active")).toBeInTheDocument();
+    const shiftContextSchema = tools.get("get_shift_context")!.inputSchema as { required?: string[] };
+    expect(shiftContextSchema.required ?? []).not.toContain("shift_id");
+    const shiftContext = await tools.get("get_shift_context")!.execute({}) as { resident_id: string; shift: { id: string }; schedule_snapshot_id: string; resolved_from: string };
+    expect(shiftContext).toMatchObject({ resident_id: "rose-demo", shift: { id: "shift-wed-pm" }, schedule_snapshot_id: "schedule-snapshot-bootstrap", resolved_from: "active_disrupted_shift" });
+    await expect(tools.get("get_shift_context")!.execute({ shift_id: "x" })).rejects.toThrow();
+    expect(tools.has("get_shift_context")).toBe(true);
     selectScenario("on_schedule");
     fireEvent.click(await screen.findByRole("button", { name: "Rose’s station" }));
     expect(await screen.findByRole("heading", { name: "Good morning, Rose." })).toBeInTheDocument();

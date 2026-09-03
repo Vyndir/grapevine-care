@@ -1,6 +1,6 @@
 {
   "name": "grapevine-care-webmcp",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "Grapevine Care, a safety-first caregiver continuity simulation using WebMCP.",
   "license": "MIT",
   "repository": {

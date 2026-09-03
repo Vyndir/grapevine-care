@@ -14,14 +14,37 @@ The agent contributes cross-system context, deterministic explanations, and
 prepared drafts. People retain assignment, visit, handoff, and clinical
 authority.
 
+## Recommended WebMCP test environment
+
+- Latest ChatGPT desktop app.
+- ChatGPT's built-in browser with **Enable site tools** turned on under Browser
+  settings → Permissions.
+- An account and selected model that support Site Tools.
+- Keep the Grapevine Care page open; page-scoped tools are available only while
+  their page is open.
+
+Open the address-bar Site Tools menu before the prompt. In the initial call-out
+state, expect six tools:
+
+```text
+get_resident_context       get_care_story
+get_care_evidence          get_shift_context
+get_coverage_candidates    prepare_shift_coverage
+```
+
+Seventeen tools exist across the complete application. Grapevine deliberately
+offers only four persistent caregiver-context reads plus the currently valid
+workflow tools. The capability chip on the main caregiver page mirrors this
+expected set.
+
 ## Two-minute interactive verification
 
 1. Open the live site on **Caregiver call-out**.
-2. Ask: “Inspect Rose's uncovered 5 PM shift, explain every candidate against
-   the explicit constraints, and prepare the eligible option for scheduler
+2. Ask: “Rose's 5 PM caregiver called out. Determine who is eligible to cover
+   the shift, explain every candidate against the explicit constraints, and prepare the eligible option for scheduler
    review. Do not assign anyone or use an opaque score.”
-3. Confirm the agent uses `get_shift_context`, `get_coverage_candidates`, and
-   `prepare_shift_coverage`.
+3. Confirm the agent begins with `get_shift_context({})`—without an internal
+   shift ID—then uses `get_coverage_candidates` and `prepare_shift_coverage`.
 4. Confirm only Jordan is eligible and the visible drawer says the schedule has
    not changed.
 5. Approve the assignment. Confirm coverage tools disappear and
@@ -48,8 +71,8 @@ Run the complete verification suite with `pnpm run verify`.
 
 ## Key implementation claims
 
-- Seventeen total WebMCP tools; only the state- and workspace-appropriate subset
-  is registered.
+- Seventeen total WebMCP tools; four safe caregiver-context reads remain
+  discoverable during the call-out while consequential tools follow state.
 - Six tools are dedicated to caregiver continuity.
 - Eight deterministic candidate checks; zero opaque suitability scores.
 - Evidence and schedule snapshots fail closed when state changes.
@@ -63,7 +86,7 @@ Run the complete verification suite with `pnpm run verify`.
 | Criterion | Evidence in this build |
 | --- | --- |
 | WebMCP leverage | Cross-system caregiver work is exposed as six purpose-built, state-dependent tools; schemas, freshness, and human gates are part of the interaction rather than prompt prose |
-| Execution | Complete D1-backed state machine, deterministic reset, responsive UI, version conflicts, idempotency, and 26 passing tests |
+| Execution | Complete D1-backed state machine, deterministic reset, responsive UI, version conflicts, idempotency, and 27 passing tests |
 | Potential impact | Addresses a concrete continuity failure: safe coverage recovery and context transfer when care changes hands |
 | Creativity and ambition | Combines agents, caregiver operations, resident context, visit evidence, human approvals, and extensible device adapters without turning AI into a clinical or workforce authority |
 
