@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CareEvent, CareState, CareTeamDay, CareTeamHandoff, CoverageCandidate, CoverageProposal, OrientationPacket, PreparedAction, ResidentCheckIn, ResidentResponseCode, Scenario, ShiftHandoff } from "./schemas";
+import type { CareEvent, CareState, CareTeamDay, CareTeamHandoff, CoverageCandidate, CoverageProposal, OrientationPacket, PreparedAction, ResidentCheckIn, ResidentResponseCode, Scenario, ShiftHandoff, TeamInquiry } from "./schemas";
 
 const demoRunStorageKey = "grapevine-care-demo-run";
 
@@ -36,6 +36,9 @@ export type CareActions = {
   resolveCareTeamReview(handoffId: string, resolution: "approved_in_demo" | "dismissed"): Promise<CareState>;
   getShiftContext(input?: { shift_id?: string; resident_ref?: string; }): Promise<Record<string, unknown>>;
   getCareTeamOverview(): Promise<{ fictional: true; simulated_time: string; step: number; step_label: string; residents: CareTeamDay["residents"]; attention_queue: CareTeamDay["attention_queue"]; next_event_label: string | null; ordering_basis: string; interpretation_boundary: string; }>;
+  prepareTeamInquiry(input: { resident_ref: string; caregiver_id: string; prompt: string; idempotency_key: string; }): Promise<{ inquiry: TeamInquiry; approval_required: boolean; external_side_effect: false; }>;
+  resolveTeamInquiry(inquiryId: string, decision: "send_in_demo" | "dismissed"): Promise<CareState>;
+  closeTeamInquiry(inquiryId: string): Promise<CareState>;
   advanceCareTeamDay(): Promise<CareState>;
   prepareAssignmentOrientation(input: { resident_ref: string; caregiver_id: string; reason: string; idempotency_key: string; }): Promise<{ packet: OrientationPacket; acknowledgement_required: boolean; external_side_effect: false; }>;
   acknowledgeAssignmentOrientation(packetId: string): Promise<CareState>;
@@ -72,7 +75,7 @@ export function useCare() {
     const initialize = async () => {
       if (!demoRunRef.current.isNew) return refresh();
       demoRunRef.current.isNew = false;
-      const result = await api<{ state: CareState }>("/api/care/scenario", demoRunRef.current.id, { method: "POST", body: JSON.stringify({ scenario: "coverage_callout" }) });
+      const result = await api<{ state: CareState }>("/api/care/scenario", demoRunRef.current.id, { method: "POST", body: JSON.stringify({ scenario: "care_team_day" }) });
       return commit(result.state);
     };
     void initialize().catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not load care workspace."));
@@ -150,6 +153,28 @@ export function useCare() {
 
   const getCareTeamOverview = useCallback(() =>
     api<Awaited<ReturnType<CareActions["getCareTeamOverview"]>>>("/api/care/team-overview", demoRunRef.current.id, { method: "POST", body: "{}" }), []);
+
+  const prepareTeamInquiry = useCallback(async (input: { resident_ref: string; caregiver_id: string; prompt: string; idempotency_key: string; }) => {
+    const result = await api<Awaited<ReturnType<CareActions["prepareTeamInquiry"]>>>("/api/care/team-inquiries", demoRunRef.current.id, { method: "POST", body: JSON.stringify(input) });
+    await refresh();
+    return result;
+  }, [refresh]);
+
+  const resolveTeamInquiry = useCallback(async (inquiryId: string, decision: "send_in_demo" | "dismissed") => {
+    setBusy(true);
+    try {
+      const result = await api<{ state: CareState }>(`/api/care/team-inquiries/${encodeURIComponent(inquiryId)}/resolve`, demoRunRef.current.id, { method: "POST", body: JSON.stringify({ decision }) });
+      return commit(result.state);
+    } finally { setBusy(false); }
+  }, [commit]);
+
+  const closeTeamInquiry = useCallback(async (inquiryId: string) => {
+    setBusy(true);
+    try {
+      const result = await api<{ state: CareState }>(`/api/care/team-inquiries/${encodeURIComponent(inquiryId)}/close`, demoRunRef.current.id, { method: "POST", body: "{}" });
+      return commit(result.state);
+    } finally { setBusy(false); }
+  }, [commit]);
 
   const advanceCareTeamDay = useCallback(async () => {
     setBusy(true);
@@ -234,6 +259,6 @@ export function useCare() {
     } finally { setBusy(false); }
   }, [commit]);
 
-  const actions = useMemo<CareActions>(() => ({ getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview, getShiftContext, getCareTeamOverview, advanceCareTeamDay, prepareAssignmentOrientation, acknowledgeAssignmentOrientation, getCoverageCandidates, prepareShiftCoverage, resolveShiftCoverage, getChangesSinceLastShift, getShiftBrief, startShift, completeShift, prepareShiftHandoff, resolveShiftHandoff, acknowledgeShiftHandoff }), [getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview, getShiftContext, getCareTeamOverview, advanceCareTeamDay, prepareAssignmentOrientation, acknowledgeAssignmentOrientation, getCoverageCandidates, prepareShiftCoverage, resolveShiftCoverage, getChangesSinceLastShift, getShiftBrief, startShift, completeShift, prepareShiftHandoff, resolveShiftHandoff, acknowledgeShiftHandoff]);
+  const actions = useMemo<CareActions>(() => ({ getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview, getShiftContext, getCareTeamOverview, prepareTeamInquiry, resolveTeamInquiry, closeTeamInquiry, advanceCareTeamDay, prepareAssignmentOrientation, acknowledgeAssignmentOrientation, getCoverageCandidates, prepareShiftCoverage, resolveShiftCoverage, getChangesSinceLastShift, getShiftBrief, startShift, completeShift, prepareShiftHandoff, resolveShiftHandoff, acknowledgeShiftHandoff }), [getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview, getShiftContext, getCareTeamOverview, prepareTeamInquiry, resolveTeamInquiry, closeTeamInquiry, advanceCareTeamDay, prepareAssignmentOrientation, acknowledgeAssignmentOrientation, getCoverageCandidates, prepareShiftCoverage, resolveShiftCoverage, getChangesSinceLastShift, getShiftBrief, startShift, completeShift, prepareShiftHandoff, resolveShiftHandoff, acknowledgeShiftHandoff]);
   return { state, error, setError, busy, actions };
 }

@@ -25,30 +25,10 @@ import type { CareState, CareTeamHandoff, Dose, PreparedAction, ResidentResponse
 
 type Workspace = "resident" | "caregiver" | "system";
 
-const scenarios: Array<{ id: Scenario; label: string }> = [
-  { id: "coverage_callout", label: "Caregiver call-out" },
-  { id: "care_team_day", label: "Care Team Day" },
-  { id: "on_schedule", label: "On schedule" },
-  { id: "missed_window", label: "Missed window" },
-  { id: "care_story", label: "72-hour story" },
-  { id: "door_fault", label: "Door fault" },
-  { id: "device_offline", label: "Device offline" }
-];
-
-const scenarioPlaybook: Array<{ id: Scenario; label: string; proof: string; prompt: string; featured?: boolean }> = [
-  { id: "coverage_callout", label: "Caregiver call-out", proof: "Complete continuity loop", prompt: "Rose’s caregiver called out. Help me recover coverage safely.", featured: true },
-  { id: "care_team_day", label: "Care Team Day", proof: "Three residents across one compressed day", prompt: "I’m taking over the care team. What needs attention and why?", featured: true },
-  { id: "care_story", label: "72-hour story", proof: "Baseline-aware longitudinal context", prompt: "How has Rose been doing relative to her usual routine?" },
-  { id: "missed_window", label: "Missed window", proof: "Uncertainty and resident-supplied evidence", prompt: "What do we actually know about Rose’s missed window?" },
-  { id: "device_offline", label: "Device offline", proof: "Device-aware reasoning without false certainty", prompt: "The station stopped reporting. What is known and unknown?" },
-  { id: "door_fault", label: "Door fault", proof: "Deterministic safety boundaries", prompt: "Why is the dispenser paused, and who has authority?" },
-  { id: "on_schedule", label: "On schedule", proof: "Useful assistance without inventing an incident", prompt: "Catch me up before Rose’s care begins today." }
-];
-
 function scenarioFromUrl(): Scenario | null {
   if (typeof window === "undefined") return null;
   const requested = new URLSearchParams(window.location.search).get("scenario");
-  return scenarios.some((scenario) => scenario.id === requested) ? requested as Scenario : null;
+  return requested === "care_team_day" ? requested : null;
 }
 
 function timeLabel(value: string, timeZone: string) {
@@ -186,6 +166,7 @@ const toolDetails: Record<string, [string, string]> = {
   get_shift_brief: ["Person, plan, changes, unresolved items, and boundaries", "read only"],
   prepare_shift_handoff: ["Completed visit evidence staged for outgoing-caregiver approval", "approval gated"],
   get_care_team_overview: ["Three residents, operational deadlines, known facts, unknowns, and human owners", "read only"],
+  prepare_team_inquiry: ["A bounded caregiver status question staged from current evidence", "coordinator approval gated"],
   prepare_assignment_orientation: ["Resident-specific orientation staged for caregiver acknowledgement", "caregiver gated"]
 };
 
@@ -213,7 +194,7 @@ export default function App() {
   const deepLinkApplied = useRef(false);
   const pending = care.state?.actions.find((action) => action.status === "awaiting_human_approval");
   const pendingHandoff = care.state?.handoffs.find((handoff) => handoff.status === "awaiting_human_approval");
-  const pageTitle = useMemo(() => ({ resident: "Rose’s station", caregiver: "Caregiver workspace", system: "How WebMCP works" })[workspace], [workspace]);
+  const pageTitle = useMemo(() => ({ resident: "Resident response", caregiver: "Care Team Day", system: "How WebMCP works" })[workspace], [workspace]);
   useEffect(() => { document.title = `${pageTitle} · Grapevine Care`; }, [pageTitle]);
   useEffect(() => {
     if (!care.state || deepLinkApplied.current) return;
@@ -231,8 +212,9 @@ export default function App() {
 
   if (!care.state) return <main className="loading-page"><span className="brand-mark"><LeafIcon weight="fill" /></span><h1>Preparing Rose’s care workspace</h1><p>{care.error ?? "Loading the fictional demo state…"}</p>{care.error && <button type="button" onClick={() => void care.actions.refresh()}>Try again</button>}</main>;
   const state = care.state;
-  return <div className="care-shell"><header className="care-header"><Brand /><nav className="workspace-nav" aria-label="Choose workspace"><button className={workspace === "caregiver" ? "active" : ""} type="button" onClick={() => setWorkspace("caregiver")}><UsersThreeIcon />Caregiver workspace</button><button className={workspace === "resident" ? "active" : ""} type="button" onClick={() => setWorkspace("resident")}><HouseIcon />Rose’s station</button><button className={workspace === "system" ? "active" : ""} type="button" onClick={() => setWorkspace("system")}><GaugeIcon />How WebMCP works</button></nav>{(pending || pendingHandoff) && <button className="quiet-button" type="button" onClick={() => setWorkspace("caregiver")}><BellIcon />1 review waiting</button>}</header>
-    <section className="demo-bar" aria-label="Demo scenario controls"><div><span><WaveformIcon />Judge demo</span><p>Fictional data · isolated browser run · full deterministic reset</p></div><div className="scenario-picker"><details className="judge-playbook"><summary>Scenario guide</summary><div><header><span>Judge playbook</span><strong>One primary journey. Six focused proofs.</strong><p>Choose a scenario, then ask its natural-language prompt. The page exposes only the WebMCP tools valid for that state.</p></header><ul>{scenarioPlaybook.map((item) => <li key={item.id}><div><strong>{item.label}{item.featured ? <em>{item.id === "coverage_callout" ? "Primary" : "Advanced"}</em> : null}</strong><span>{item.proof}</span><code>“{item.prompt}”</code></div><button type="button" disabled={care.busy || state.resident.scenario === item.id} onClick={() => openScenario(item.id)}>{state.resident.scenario === item.id ? "Active" : "Open"}</button></li>)}</ul></div></details><label htmlFor="demo-scenario"><span>Demo scenario</span><select id="demo-scenario" value={state.resident.scenario} disabled={care.busy} onChange={(event) => openScenario(event.target.value as Scenario)}>{scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.label}</option>)}</select></label><button className="reset-button" type="button" disabled={care.busy} onClick={() => void care.actions.setScenario(state.resident.scenario)} aria-label="Reset current demo"><ArrowClockwiseIcon /></button></div></section>
+  const residentResponsePending = state.resident_check_ins.some((checkIn) => checkIn.status === "awaiting_resident");
+  return <div className="care-shell"><header className="care-header"><Brand /><nav className="workspace-nav" aria-label="Choose workspace"><button className={workspace === "caregiver" ? "active" : ""} type="button" onClick={() => setWorkspace("caregiver")}><UsersThreeIcon />Care Team Day</button>{residentResponsePending && <button className={workspace === "resident" ? "active" : ""} type="button" onClick={() => setWorkspace("resident")}><HouseIcon />Resident response</button>}<button className={workspace === "system" ? "active" : ""} type="button" onClick={() => setWorkspace("system")}><GaugeIcon />How WebMCP works</button></nav>{(pending || pendingHandoff) && <button className="quiet-button" type="button" onClick={() => setWorkspace("caregiver")}><BellIcon />1 review waiting</button>}</header>
+    <section className="demo-bar simplified" aria-label="Care Team Day demo controls"><div><span><WaveformIcon />Care Team Day</span><p>One compressed shift · decisions must be accounted for before time advances</p></div><div className="scenario-picker"><span className="inquiry-rule">Observe → investigate → decide → document</span><button className="reset-button" type="button" disabled={care.busy} onClick={() => void care.actions.setScenario("care_team_day")} aria-label="Reset Care Team Day"><ArrowClockwiseIcon /></button></div></section>
     {workspace === "resident" && <ResidentView state={state} actions={care.actions} busy={care.busy} onMessage={setMessage} />}{workspace === "caregiver" && <CaregiverView state={state} actions={care.actions} busy={care.busy} onMessage={setMessage} webmcp={webmcp} onExploreTeamDay={() => openScenario("care_team_day")} />}{workspace === "system" && <SystemView state={state} webmcp={webmcp} />}
     <footer className="care-footer"><Brand /><p>Safety-first WebMCP prototype · fictional demonstration · independent MIT-licensed healthcare adaptation</p><a href="https://github.com/Vyndir/grapevine-care" target="_blank" rel="noreferrer">Public source</a></footer>
     {(pending || pendingHandoff) && <ReviewDrawer action={pending} handoff={pendingHandoff} actions={care.actions} busy={care.busy} onMessage={setMessage} />}

@@ -39,6 +39,7 @@ class TestD1 {
     this.sqlite.exec(readFileSync(new URL("../drizzle/0004_longitudinal_care_story.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0005_caregiver_continuity_loop.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0006_care_team_day.sql", import.meta.url), "utf8"));
+    this.sqlite.exec(readFileSync(new URL("../drizzle/0007_inquiry_driven_day.sql", import.meta.url), "utf8"));
   }
   close() { this.sqlite.close(); }
 }
@@ -284,13 +285,27 @@ describe("Grapevine Care server invariants", () => {
     const evelynContext = await (await call(runA, "/api/care/shift-context", { method: "POST", body: JSON.stringify({ resident_ref: "Evelyn" }) })).json() as { shift: { id: string }; resolved_from: string };
     expect(evelynContext).toMatchObject({ shift: { id: "shift-evelyn-am" }, resolved_from: "resident_reference" });
 
+    const blocked = await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" });
+    expect(blocked.status).toBe(409);
+    expect(await blocked.json()).toMatchObject({ blocked_by: [expect.stringContaining("Investigate Evelyn")] });
+
+    const inquiryResponse = await call(runA, "/api/care/team-inquiries", { method: "POST", body: JSON.stringify({ resident_ref: "Evelyn", caregiver_id: "caregiver-luis", prompt: "Please confirm your current status for Evelyn's scheduled morning visit.", idempotency_key: "evelyn-inquiry-001" }) });
+    expect(inquiryResponse.status).toBe(200);
+    const inquiry = await inquiryResponse.json() as { inquiry: { id: string; status: string }; approval_required: boolean };
+    expect(inquiry).toMatchObject({ inquiry: { status: "awaiting_coordinator_approval" }, approval_required: true });
+    expect((await call(runA, `/api/care/team-inquiries/${inquiry.inquiry.id}/resolve`, { method: "POST", body: JSON.stringify({ decision: "send_in_demo" }) })).status).toBe(200);
+    current = await state(runA);
+    expect(current.care_team_day?.inquiries[0]).toMatchObject({ status: "response_received", response_code: "arrived_verification_failed" });
+    expect((await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" })).status).toBe(409);
+    expect((await call(runA, `/api/care/team-inquiries/${inquiry.inquiry.id}/close`, { method: "POST", body: "{}" })).status).toBe(200);
+    current = await state(runA);
+    expect(current.care_team_day?.advance_gate.allowed).toBe(true);
+
     expect((await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" })).status).toBe(200);
     current = await state(runA);
     expect(current.care_team_day?.step).toBe(1);
     expect(current.care_team_day?.attention_queue.find((item) => item.resident_id === "evelyn-demo")?.state).toBe("resolved");
-    expect(current.visit_events.some((event) => event.id === "team-evelyn-checkin")).toBe(true);
 
-    await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" });
     const prepared = await (await call(runA, "/api/care/orientation-packets", { method: "POST", body: JSON.stringify({ resident_ref: "Walter", caregiver_id: "caregiver-elena", reason: "Prepare the current resident-specific orientation before assignment readiness.", idempotency_key: "walter-orientation-001" }) })).json() as { packet: { id: string; status: string }; acknowledgement_required: boolean };
     expect(prepared.packet.status).toBe("awaiting_caregiver_acknowledgement");
     expect(prepared.acknowledgement_required).toBe(true);
@@ -302,7 +317,7 @@ describe("Grapevine Care server invariants", () => {
 
     await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" });
     current = await state(runA);
-    expect(current.care_team_day?.step).toBe(3);
+    expect(current.care_team_day?.step).toBe(2);
     expect(current.shifts.find((shift) => shift.id === "shift-wed-pm")).toMatchObject({ coverage_status: "coverage_needed", assigned_caregiver_id: null });
     expect(current.care_team_day?.attention_queue.find((item) => item.resident_id === "rose-demo")?.attention_reason).toContain("called out");
   });

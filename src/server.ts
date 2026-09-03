@@ -11,6 +11,7 @@ import {
   prepareAssignmentOrientationArgsSchema,
   prepareCaregiverCheckInArgsSchema,
   prepareResidentCheckInArgsSchema,
+  prepareTeamInquiryArgsSchema,
   prepareShiftCoverageArgsSchema,
   prepareShiftHandoffArgsSchema,
   requestDeviceHealthSnapshotArgsSchema,
@@ -21,6 +22,7 @@ import {
   type CoverageCandidate,
   type CareTeamDay,
   type OrientationPacket,
+  type TeamInquiry,
   type ResidentResponseCode,
   type Scenario
 } from "./schemas";
@@ -51,6 +53,7 @@ type DbVisitEvent = { visit_event_id: string; shift_id: string; caregiver_id: st
 type DbShiftHandoff = { shift_handoff_id: string; shift_id: string; from_caregiver_id: string; to_caregiver_id: string; schedule_snapshot_id: string; completed_json: string; observed_json: string; unresolved_json: string; status: "awaiting_caregiver_approval" | "available_to_next_caregiver" | "dismissed" | "acknowledged"; idempotency_key: string; created_at: string; resolved_at: string | null; };
 type DbHandoffAcknowledgement = { acknowledgement_id: string; shift_handoff_id: string; caregiver_id: string; acknowledged_at: string; };
 type DbOrientationPacket = { packet_id: string; resident_id: "rose-demo" | "walter-demo" | "evelyn-demo"; caregiver_id: string; care_plan_version: string; status: "awaiting_caregiver_acknowledgement" | "acknowledged"; reason: string; idempotency_key: string; created_at: string; acknowledged_at: string | null; };
+type DbTeamInquiry = { inquiry_id: string; resident_id: "rose-demo" | "walter-demo" | "evelyn-demo"; caregiver_id: string; inquiry_type: "visit_verification"; prompt: string; status: "awaiting_coordinator_approval" | "response_received" | "resolved" | "dismissed"; response_code: "arrived_verification_failed" | "delayed" | "cannot_attend" | "no_response" | null; response_detail: string | null; idempotency_key: string; created_at: string; responded_at: string | null; resolved_at: string | null; };
 
 const residentId = "rose-demo";
 const demoRunHeader = "x-grapevine-demo-run";
@@ -95,6 +98,7 @@ async function resetDemoRun(db: D1Database, runId: string, scenario: Scenario) {
   const now = new Date().toISOString();
   const hasCallout = scenario === "coverage_callout";
   await db.batch([
+    db.prepare("DELETE FROM care_demo_team_inquiries WHERE run_id = ?").bind(runId),
     db.prepare("DELETE FROM care_demo_orientation_packets WHERE run_id = ?").bind(runId),
     db.prepare("DELETE FROM care_demo_handoff_acknowledgements WHERE run_id = ?").bind(runId),
     db.prepare("DELETE FROM care_demo_shift_handoffs WHERE run_id = ?").bind(runId),
@@ -256,14 +260,18 @@ function buildCareStory(run: DbRun, events: DbEvent[]): CareStory {
 }
 
 const careTeamTimeline = [
-  { step: 0, time: "9:15 AM", label: "Evelyn verification gap" },
-  { step: 1, time: "10:30 AM", label: "Evelyn check-in arrives" },
-  { step: 2, time: "11:30 AM", label: "Walter readiness review" },
-  { step: 3, time: "2:15 PM", label: "Rose caregiver call-out" },
-  { step: 4, time: "5:00 PM", label: "Rose replacement visit" },
-  { step: 5, time: "7:35 PM", label: "Rose visit completion" },
-  { step: 6, time: "8:00 PM", label: "Continuity handoff" }
+  { step: 0, time: "9:15 AM", label: "Morning verification" },
+  { step: 1, time: "11:30 AM", label: "Assignment readiness" },
+  { step: 2, time: "2:15 PM", label: "Coverage recovery" },
+  { step: 3, time: "5:00 PM", label: "Replacement visit" },
+  { step: 4, time: "7:35 PM", label: "Visit completion" },
+  { step: 5, time: "8:00 PM", label: "Continuity handoff" }
 ] as const;
+
+function publicTeamInquiry(inquiry: DbTeamInquiry): TeamInquiry {
+  const { inquiry_id, ...rest } = inquiry;
+  return { id: inquiry_id, ...rest };
+}
 
 function publicOrientationPacket(packet: DbOrientationPacket): OrientationPacket {
   return {
@@ -285,32 +293,35 @@ function publicOrientationPacket(packet: DbOrientationPacket): OrientationPacket
   };
 }
 
-function buildCareTeamDay(run: DbRun, shifts: DbShift[], packets: DbOrientationPacket[]): CareTeamDay | undefined {
+function buildCareTeamDay(run: DbRun, shifts: DbShift[], packets: DbOrientationPacket[], inquiryRows: DbTeamInquiry[]): CareTeamDay | undefined {
   if (run.scenario !== "care_team_day") return undefined;
   const step = run.care_team_step ?? 0;
   const orientationPackets = packets.map(publicOrientationPacket);
+  const inquiries = inquiryRows.map(publicTeamInquiry);
+  const evelynInquiry = inquiries.find((inquiry) => inquiry.resident_id === "evelyn-demo" && inquiry.inquiry_type === "visit_verification");
+  const evelynResolved = evelynInquiry?.status === "resolved";
   const orientationAcknowledged = orientationPackets.some((packet) => packet.resident_id === "walter-demo" && packet.caregiver_id === "caregiver-elena" && packet.status === "acknowledged");
   const roseShift = shifts.find((shift) => shift.shift_id === "shift-wed-pm");
   const roseResolved = Boolean(roseShift?.assigned_caregiver_id && roseShift.assigned_caregiver_id !== "caregiver-maya");
   const attention: CareTeamDay["attention_queue"] = [];
-  attention.push({
+  if (step === 0 || evelynResolved) attention.push({
     id: "attention-evelyn-evv",
     resident_id: "evelyn-demo",
     resident_name: "Evelyn",
-    state: step === 0 ? "attention_now" : "resolved",
-    attention_reason: step === 0 ? "Scheduled visit began without a verification record" : "Luis's simulated visit check-in arrived",
-    deadline: step === 0 ? "Review now · visit began at 9:00 AM" : "Resolved at 10:30 AM",
-    source: step === 0 ? "EVV adapter · no record received" : "EVV adapter · simulated caregiver attestation",
+    state: evelynResolved ? "resolved" : evelynInquiry ? "waiting_on_human" : "attention_now",
+    attention_reason: evelynResolved ? "Luis confirmed arrival; the EVV failure was documented" : evelynInquiry ? "Luis replied; review and close the verification exception" : "Scheduled visit began without a verification record",
+    deadline: evelynResolved ? "Resolved in the morning block" : "Address before advancing to 11:30 AM",
+    source: evelynResolved || evelynInquiry?.status === "response_received" ? "Luis response · simulated caregiver attestation" : "EVV adapter · no record received",
     policy_basis: "Agency visit-verification follow-up policy",
-    known: step === 0 ? ["Luis is assigned", "The visit was scheduled for 9:00 AM", "No verification record is present"] : ["Luis is assigned", "A 10:30 AM check-in record is present"],
-    unknown: step === 0 ? ["Whether Luis is physically absent", "Whether Evelyn needs assistance"] : ["The late record does not establish what occurred before 10:30 AM"],
+    known: evelynInquiry?.status === "response_received" || evelynResolved ? ["Luis is assigned", "Luis reported arriving at 9:08 AM", "Luis reported that his EVV application failed"] : ["Luis is assigned", "The visit was scheduled for 9:00 AM", "No verification record is present"],
+    unknown: evelynInquiry?.status === "response_received" || evelynResolved ? ["The caregiver report does not independently verify activity before 9:08 AM"] : ["Whether Luis is physically absent", "Whether Evelyn needs assistance"],
     human_owner: "Care coordinator"
   });
-  if (step >= 2 || !orientationAcknowledged) attention.push({
+  if (step >= 1) attention.push({
     id: "attention-walter-readiness",
     resident_id: "walter-demo",
     resident_name: "Walter",
-    state: orientationAcknowledged ? "resolved" : step >= 2 ? "waiting_on_human" : "due_later",
+    state: orientationAcknowledged ? "resolved" : "waiting_on_human",
     attention_reason: orientationAcknowledged ? "Elena acknowledged Walter orientation and Care Plan v2" : "Elena is available but not resident-specific assignment-ready",
     deadline: orientationAcknowledged ? "Resolved" : "Before the 1:00 PM visit",
     source: "Training registry + schedule + care-plan acknowledgement",
@@ -319,38 +330,65 @@ function buildCareTeamDay(run: DbRun, shifts: DbShift[], packets: DbOrientationP
     unknown: orientationAcknowledged ? [] : ["Walter orientation is incomplete", "Care Plan v2 has not been acknowledged"],
     human_owner: "Elena and scheduling coordinator"
   });
-  if (step >= 3) attention.push({
+  if (step >= 2) attention.push({
     id: "attention-rose-coverage",
     resident_id: "rose-demo",
     resident_name: "Rose",
-    state: roseResolved ? "resolved" : roseShift?.coverage_status === "awaiting_scheduler_approval" ? "waiting_on_human" : "attention_now",
+    state: step > 2 || roseResolved ? "resolved" : roseShift?.coverage_status === "awaiting_scheduler_approval" ? "waiting_on_human" : "attention_now",
     attention_reason: roseResolved ? "Replacement coverage approved" : "Maya called out for Rose's evening visit",
-    deadline: "Before the 5:00 PM visit",
+    deadline: roseResolved ? "Resolved before the visit" : "Address before advancing to 5:00 PM",
     source: "Schedule + caregiver availability",
     policy_basis: "Qualified, resident-ready coverage requires scheduler approval",
     known: ["The visit is scheduled for 5:00–8:00 PM", ...(roseResolved ? ["A replacement caregiver is assigned"] : ["No replacement assignment is approved"])],
     unknown: roseResolved ? [] : ["Who will provide the visit until the scheduler approves coverage"],
     human_owner: "Scheduling coordinator"
   });
+  if (step >= 3) {
+    const visitStarted = roseShift?.visit_status === "in_progress" || roseShift?.visit_status === "completed";
+    const visitCompleted = roseShift?.visit_status === "completed";
+    const handoffAcknowledged = roseShift?.handoff_status === "acknowledged";
+    const stage = step === 3 ? "start" : step === 4 ? "complete" : "handoff";
+    attention.push({
+      id: `attention-rose-${stage}`,
+      resident_id: "rose-demo",
+      resident_name: "Rose",
+      state: stage === "start" ? (visitStarted ? "resolved" : "attention_now") : stage === "complete" ? (visitCompleted ? "resolved" : "attention_now") : (handoffAcknowledged ? "resolved" : roseShift?.handoff_status === "available_to_next_caregiver" ? "waiting_on_human" : "attention_now"),
+      attention_reason: stage === "start" ? (visitStarted ? "Jordan acknowledged the brief and started the visit" : "Jordan must review the brief and start the visit") : stage === "complete" ? (visitCompleted ? "Jordan completed the visit and recorded bounded observations" : "Record the visit outcome before the handoff") : (handoffAcknowledged ? "Luis acknowledged the continuity handoff" : "Prepare, approve, and acknowledge the continuity handoff"),
+      deadline: stage === "start" ? "At the 5:00 PM visit" : stage === "complete" ? "Before 8:00 PM handoff" : "End-of-day continuity checkpoint",
+      source: "Assignment, visit evidence, and handoff records",
+      policy_basis: "Every transition requires an accountable human acknowledgement",
+      known: [roseShift?.assigned_caregiver_id ? "An approved caregiver is assigned" : "No caregiver is assigned", `Visit status: ${roseShift?.visit_status ?? "unknown"}`, `Handoff status: ${roseShift?.handoff_status ?? "unknown"}`],
+      unknown: stage === "start" && !visitStarted ? ["Whether Jordan reviewed the current brief"] : stage === "complete" && !visitCompleted ? ["What occurred during the visit"] : stage === "handoff" && !handoffAcknowledged ? ["Whether the next caregiver received and acknowledged continuity context"] : [],
+      human_owner: stage === "handoff" ? "Jordan and Luis" : "Jordan"
+    });
+  }
+  const blockers = step === 0 ? (evelynResolved ? [] : [evelynInquiry?.status === "response_received" ? "Review Luis’s response and close Evelyn’s verification exception." : evelynInquiry ? "Approve the prepared check-in and review Luis’s response." : "Investigate Evelyn’s missing verification record by checking in with Luis."])
+    : step === 1 ? (orientationAcknowledged ? [] : ["Elena must review and acknowledge Walter’s current orientation packet."])
+    : step === 2 ? (roseResolved ? [] : ["A scheduler must approve qualified replacement coverage for Rose."])
+    : step === 3 ? (roseShift?.visit_status === "in_progress" || roseShift?.visit_status === "completed" ? [] : ["Jordan must acknowledge the current brief and start the visit."])
+    : step === 4 ? (roseShift?.visit_status === "completed" ? [] : ["Jordan must record the visit outcome before handoff."])
+    : (roseShift?.handoff_status === "acknowledged" ? [] : ["The outgoing caregiver must approve the handoff and Luis must acknowledge it."]);
   return {
     step,
     step_label: careTeamTimeline[step]?.label ?? careTeamTimeline[0].label,
     next_event_label: careTeamTimeline[step + 1]?.label ?? null,
     timeline: careTeamTimeline.map((item) => ({ ...item })),
     residents: [
-      { id: "rose-demo", display_name: "Rose", age: 79, care_plan_version: "v4", support_setting: "Independent living · in-home care", headline: step >= 3 ? (roseResolved ? "Evening coverage restored" : "Evening coverage needs a decision") : "Evening visit currently covered", status: step >= 3 ? (roseResolved ? "resolved" : "attention") : "routine", preferences: ["Call before visiting", "Use large, direct language"], context: ["Mild memory difficulties", "Uses a documented medication routine"] },
-      { id: "walter-demo", display_name: "Walter", age: 84, care_plan_version: "v2", support_setting: "In-home afternoon support", headline: orientationAcknowledged ? "Elena is resident-ready" : "Orientation and plan acknowledgement needed", status: orientationAcknowledged ? "resolved" : step >= 2 ? "waiting_on_human" : "attention", preferences: ["Knock and announce before entering", "Use written reminders"], context: ["Uses a walker", "Prefers lunch before afternoon activities"] },
-      { id: "evelyn-demo", display_name: "Evelyn", age: 81, care_plan_version: "v3", support_setting: "Assisted living · morning visit", headline: step === 0 ? "Visit verification not received" : "Visit check-in received", status: step === 0 ? "attention" : "resolved", preferences: ["Quiet morning routine", "Daughter receives schedule updates"], context: ["Morning support visit", "Attendance evidence is operational, not clinical"] }
+      { id: "rose-demo", display_name: "Rose", age: 79, care_plan_version: "v4", support_setting: "Independent living · in-home care", headline: step >= 2 ? (roseResolved ? "Evening coverage restored" : "Evening coverage needs a decision") : "Evening visit currently covered", status: step >= 2 ? (roseResolved ? "resolved" : "attention") : "routine", preferences: ["Call before visiting", "Use large, direct language"], context: ["Mild memory difficulties", "Uses a documented medication routine"] },
+      { id: "walter-demo", display_name: "Walter", age: 84, care_plan_version: "v2", support_setting: "In-home afternoon support", headline: orientationAcknowledged ? "Elena is resident-ready" : "Orientation and plan acknowledgement needed", status: orientationAcknowledged ? "resolved" : step >= 1 ? "waiting_on_human" : "routine", preferences: ["Knock and announce before entering", "Use written reminders"], context: ["Uses a walker", "Prefers lunch before afternoon activities"] },
+      { id: "evelyn-demo", display_name: "Evelyn", age: 81, care_plan_version: "v3", support_setting: "Assisted living · morning visit", headline: evelynResolved ? "Verification exception resolved" : "Visit verification needs investigation", status: evelynResolved ? "resolved" : step === 0 ? "attention" : "waiting_on_human", preferences: ["Quiet morning routine", "Daughter receives schedule updates"], context: ["Morning support visit", "Attendance evidence is operational, not clinical"] }
     ],
     attention_queue: attention,
-    orientation_packets: orientationPackets
+    orientation_packets: orientationPackets,
+    inquiries,
+    advance_gate: { allowed: blockers.length === 0, blockers, requirement: "Every item in this time block must be resolved or assigned an accountable disposition before simulated time can advance." }
   };
 }
 
 async function loadCareState(db: D1Database, runId: string): Promise<CareState | null> {
   const run = await db.prepare("SELECT * FROM care_demo_runs WHERE run_id = ?").bind(runId).first<DbRun>();
   if (!run) return null;
-  const [doses, devices, inventory, events, residentCheckIns, actions, profile, monitoringRules, handoffs, caregivers, availability, readiness, shifts, coverageProposals, visitEvents, shiftHandoffs, handoffAcknowledgements, orientationPackets] = await Promise.all([
+  const [doses, devices, inventory, events, residentCheckIns, actions, profile, monitoringRules, handoffs, caregivers, availability, readiness, shifts, coverageProposals, visitEvents, shiftHandoffs, handoffAcknowledgements, orientationPackets, teamInquiries] = await Promise.all([
     db.prepare("SELECT * FROM care_demo_doses WHERE run_id = ? ORDER BY scheduled_time").bind(runId).all<DbDose>(),
     db.prepare("SELECT * FROM care_demo_devices WHERE run_id = ? ORDER BY name").bind(runId).all<DbDevice>(),
     db.prepare("SELECT * FROM care_demo_inventory WHERE run_id = ?").bind(runId).first<DbInventory>(),
@@ -368,7 +406,8 @@ async function loadCareState(db: D1Database, runId: string): Promise<CareState |
     db.prepare("SELECT * FROM care_demo_visit_events WHERE run_id = ? ORDER BY occurred_at").bind(runId).all<DbVisitEvent>(),
     db.prepare("SELECT * FROM care_demo_shift_handoffs WHERE run_id = ? ORDER BY created_at DESC LIMIT 8").bind(runId).all<DbShiftHandoff>(),
     db.prepare("SELECT * FROM care_demo_handoff_acknowledgements WHERE run_id = ? ORDER BY acknowledged_at DESC").bind(runId).all<DbHandoffAcknowledgement>(),
-    db.prepare("SELECT * FROM care_demo_orientation_packets WHERE run_id = ? ORDER BY created_at DESC").bind(runId).all<DbOrientationPacket>()
+    db.prepare("SELECT * FROM care_demo_orientation_packets WHERE run_id = ? ORDER BY created_at DESC").bind(runId).all<DbOrientationPacket>(),
+    db.prepare("SELECT * FROM care_demo_team_inquiries WHERE run_id = ? ORDER BY created_at DESC").bind(runId).all<DbTeamInquiry>()
   ]);
   if (!inventory || !profile) return null;
   const publicDevices = devices.results.map(({ device_id, capabilities, ...device }) => ({ id: device_id, ...device, capabilities: JSON.parse(capabilities) as string[] }));
@@ -397,7 +436,7 @@ async function loadCareState(db: D1Database, runId: string): Promise<CareState |
     visit_events: visitEvents.results.map(({ visit_event_id, ...event }) => ({ id: visit_event_id, ...event })),
     shift_handoffs: shiftHandoffs.results.map(({ shift_handoff_id, completed_json, observed_json, unresolved_json, ...handoff }) => ({ id: shift_handoff_id, ...handoff, completed: JSON.parse(completed_json) as string[], observed: JSON.parse(observed_json) as string[], unresolved: JSON.parse(unresolved_json) as string[] })),
     handoff_acknowledgements: handoffAcknowledgements.results.map(({ acknowledgement_id, ...acknowledgement }) => ({ id: acknowledgement_id, ...acknowledgement })),
-    care_team_day: buildCareTeamDay(run, shifts.results, orientationPackets.results),
+    care_team_day: buildCareTeamDay(run, shifts.results, orientationPackets.results, teamInquiries.results),
     care_plan: { version: run.care_plan_version, effective_at: run.care_plan_effective_at, authorized_by: run.care_plan_authorized_by, authorization_role: run.care_plan_authorization_role, device_applied_version: pillbox?.applied_plan_version ?? null, alignment: pillbox?.applied_plan_version === run.care_plan_version ? "aligned" : "mismatch" },
     safety_contract: {
       ai_may: ["Read structured care, schedule, readiness, and continuity evidence", "Explain deterministic coverage constraints", "Summarize changes since a caregiver’s last shift", "Stage coverage or handoff drafts for explicit human approval"],
@@ -513,25 +552,86 @@ async function getCareTeamOverview(db: D1Database, runId: string, body: Record<s
     residents: state.care_team_day.residents,
     attention_queue: state.care_team_day.attention_queue,
     next_event_label: state.care_team_day.next_event_label,
+    advance_gate: state.care_team_day.advance_gate,
     ordering_basis: "Deterministic deadlines and agency workflow policy; no medical severity or opaque AI score.",
     interpretation_boundary: "Missing evidence remains unknown. The agent may explain operational context but cannot diagnose, triage, or infer caregiver absence."
   });
 }
 
 const careTeamStepTimes = [
-  "2026-09-02T09:15:00-04:00", "2026-09-02T10:30:00-04:00", "2026-09-02T11:30:00-04:00",
-  "2026-09-02T14:15:00-04:00", "2026-09-02T17:00:00-04:00", "2026-09-02T19:35:00-04:00", "2026-09-02T20:00:00-04:00"
+  "2026-09-02T09:15:00-04:00", "2026-09-02T11:30:00-04:00", "2026-09-02T14:15:00-04:00",
+  "2026-09-02T17:00:00-04:00", "2026-09-02T19:35:00-04:00", "2026-09-02T20:00:00-04:00"
 ];
+
+async function prepareTeamInquiry(db: D1Database, runId: string, body: Record<string, unknown>) {
+  const parsed = prepareTeamInquiryArgsSchema.safeParse(body);
+  if (!parsed.success) return json({ error: "Invalid team inquiry request." }, 400);
+  const state = await loadCareState(db, runId);
+  if (!state?.care_team_day || state.care_team_day.step !== 0) return json({ error: "The Evelyn verification inquiry is available only during the morning verification block." }, 409);
+  const resident = resolveTeamResidentRef(state, parsed.data.resident_ref);
+  if (resident !== "evelyn-demo" || parsed.data.caregiver_id !== "caregiver-luis") return json({ error: "This investigation must ask Evelyn's assigned caregiver, Luis, about the missing visit verification." }, 409);
+  const duplicate = await db.prepare("SELECT * FROM care_demo_team_inquiries WHERE run_id = ? AND idempotency_key = ?").bind(runId, parsed.data.idempotency_key).first<DbTeamInquiry>();
+  if (duplicate) return json({ inquiry: publicTeamInquiry(duplicate), approval_required: duplicate.status === "awaiting_coordinator_approval", external_side_effect: false, idempotent_replay: true });
+  const existing = await db.prepare("SELECT inquiry_id FROM care_demo_team_inquiries WHERE run_id = ? AND inquiry_type = 'visit_verification' AND status != 'dismissed' LIMIT 1").bind(runId).first<{ inquiry_id: string }>();
+  if (existing) return json({ error: "A visit-verification inquiry is already active." }, 409);
+  const inquiryId = `inq_${crypto.randomUUID()}`;
+  await db.batch([
+    db.prepare("INSERT INTO care_demo_team_inquiries (run_id, inquiry_id, resident_id, caregiver_id, inquiry_type, prompt, status, response_code, response_detail, idempotency_key, created_at, responded_at, resolved_at) VALUES (?, ?, 'evelyn-demo', 'caregiver-luis', 'visit_verification', ?, 'awaiting_coordinator_approval', NULL, NULL, ?, ?, NULL, NULL)").bind(runId, inquiryId, parsed.data.prompt, parsed.data.idempotency_key, state.resident.simulated_time),
+    evidenceInsert(db, runId, { resident_id: "evelyn-demo", event_type: "visit_verification_inquiry_prepared", severity: "attention", summary: "Luis check-in prepared", detail: "The agent staged a bounded operational question. Nothing was sent until the coordinator reviews it.", source: "WebMCP tool · coordinator approval required", occurred_at: state.resident.simulated_time, actor_type: "agent", actor_id: "page-agent", evidence_type: "prepared_action", observed_at: state.resident.simulated_time, recorded_at: state.resident.simulated_time, trust_boundary: "agent_prepared_team_inquiry", plan_version: "v3" }),
+    versionBump(db, runId, state.resident.simulated_time)
+  ]);
+  const inquiry = await db.prepare("SELECT * FROM care_demo_team_inquiries WHERE run_id = ? AND inquiry_id = ?").bind(runId, inquiryId).first<DbTeamInquiry>();
+  return json({ inquiry: inquiry ? publicTeamInquiry(inquiry) : null, approval_required: true, external_side_effect: false });
+}
+
+async function resolveTeamInquiry(db: D1Database, runId: string, inquiryId: string, body: Record<string, unknown>) {
+  const decision = body.decision;
+  if (decision !== "send_in_demo" && decision !== "dismissed") return json({ error: "Invalid inquiry decision." }, 400);
+  const run = await db.prepare("SELECT * FROM care_demo_runs WHERE run_id = ?").bind(runId).first<DbRun>();
+  const inquiry = await db.prepare("SELECT * FROM care_demo_team_inquiries WHERE run_id = ? AND inquiry_id = ?").bind(runId, inquiryId).first<DbTeamInquiry>();
+  if (!run || !inquiry) return json({ error: "Team inquiry not found." }, 404);
+  if (inquiry.status !== "awaiting_coordinator_approval") return json({ state: await loadCareState(db, runId), already_decided: true, external_side_effect: false });
+  if (decision === "dismissed") {
+    await db.batch([
+      db.prepare("UPDATE care_demo_team_inquiries SET status = 'dismissed', resolved_at = ? WHERE run_id = ? AND inquiry_id = ?").bind(run.simulated_time, runId, inquiryId),
+      versionBump(db, runId, run.simulated_time)
+    ]);
+    return json({ state: await loadCareState(db, runId), external_side_effect: false });
+  }
+  const respondedAt = plusMinutes(run.simulated_time, 3);
+  const responseDetail = "Luis reports: ‘I arrived at 9:08 AM. My EVV application would not complete check-in, so I began the scheduled visit and am with Evelyn now.’";
+  await db.batch([
+    db.prepare("UPDATE care_demo_team_inquiries SET status = 'response_received', response_code = 'arrived_verification_failed', response_detail = ?, responded_at = ? WHERE run_id = ? AND inquiry_id = ? AND status = 'awaiting_coordinator_approval'").bind(responseDetail, respondedAt, runId, inquiryId),
+    evidenceInsert(db, runId, { resident_id: "evelyn-demo", event_type: "caregiver_visit_status_response", severity: "routine", summary: "Luis responded to the verification inquiry", detail: responseDetail, source: "Luis · simulated caregiver self-report", occurred_at: respondedAt, actor_type: "caregiver", actor_id: "caregiver-luis", evidence_type: "self_report", observed_at: respondedAt, recorded_at: respondedAt, trust_boundary: "caregiver_self_report_not_independent_evv", plan_version: "v3" }),
+    versionBump(db, runId, respondedAt)
+  ]);
+  return json({ state: await loadCareState(db, runId), response_received: true, external_side_effect: false });
+}
+
+async function closeTeamInquiry(db: D1Database, runId: string, inquiryId: string) {
+  const run = await db.prepare("SELECT * FROM care_demo_runs WHERE run_id = ?").bind(runId).first<DbRun>();
+  const inquiry = await db.prepare("SELECT * FROM care_demo_team_inquiries WHERE run_id = ? AND inquiry_id = ?").bind(runId, inquiryId).first<DbTeamInquiry>();
+  if (!run || !inquiry) return json({ error: "Team inquiry not found." }, 404);
+  if (inquiry.status === "resolved") return json({ state: await loadCareState(db, runId), already_resolved: true, external_side_effect: false });
+  if (inquiry.status !== "response_received") return json({ error: "Review a caregiver response before closing the verification exception." }, 409);
+  await db.batch([
+    db.prepare("UPDATE care_demo_team_inquiries SET status = 'resolved', resolved_at = ? WHERE run_id = ? AND inquiry_id = ? AND status = 'response_received'").bind(run.simulated_time, runId, inquiryId),
+    evidenceInsert(db, runId, { resident_id: "evelyn-demo", event_type: "visit_verification_exception_resolved", severity: "routine", summary: "Visit-verification exception resolved", detail: "The coordinator reviewed Luis's self-report and documented an EVV application failure. No earlier absence or clinical conclusion was inferred.", source: "Care coordinator · explicit human disposition", occurred_at: run.simulated_time, actor_type: "caregiver", actor_id: "coordinator-demo", evidence_type: "human_decision", observed_at: run.simulated_time, recorded_at: run.simulated_time, trust_boundary: "explicit_coordinator_disposition", plan_version: "v3" }),
+    versionBump(db, runId, run.simulated_time)
+  ]);
+  return json({ state: await loadCareState(db, runId), external_side_effect: false });
+}
 
 async function advanceCareTeamDay(db: D1Database, runId: string) {
   const run = await db.prepare("SELECT * FROM care_demo_runs WHERE run_id = ?").bind(runId).first<DbRun>();
   if (!run || run.scenario !== "care_team_day") return json({ error: "Care Team Day is not active." }, 409);
   if (run.care_team_step >= careTeamStepTimes.length - 1) return json({ state: await loadCareState(db, runId), at_end: true });
+  const current = await loadCareState(db, runId);
+  if (!current?.care_team_day?.advance_gate.allowed) return json({ error: current?.care_team_day?.advance_gate.blockers[0] ?? "Resolve the current time block before advancing.", blocked_by: current?.care_team_day?.advance_gate.blockers ?? [] }, 409);
   const nextStep = run.care_team_step + 1;
   const nextTime = careTeamStepTimes[nextStep];
   const statements = [db.prepare("UPDATE care_demo_runs SET care_team_step = ?, simulated_time = ?, evidence_version = evidence_version + 1, updated_at = ? WHERE run_id = ? AND care_team_step = ?").bind(nextStep, nextTime, nextTime, runId, run.care_team_step)];
-  if (nextStep === 1) statements.push(db.prepare("INSERT OR IGNORE INTO care_demo_visit_events (run_id, visit_event_id, shift_id, caregiver_id, event_type, summary, detail, occurred_at, evidence_class) VALUES (?, 'team-evelyn-checkin', 'shift-evelyn-am', 'caregiver-luis', 'shift_checked_in', 'Evelyn visit check-in received', 'Luis supplied a simulated visit-verification record. The earlier evidence gap is resolved without inferring where he was before check-in.', ?, 'simulated_evv_attestation')").bind(runId, nextTime));
-  if (nextStep === 3) statements.push(db.prepare("UPDATE care_demo_shifts SET assigned_caregiver_id = NULL, coverage_status = 'coverage_needed', disruption_reason = 'Maya called out sick at 2:15 PM', version = version + 1 WHERE run_id = ? AND shift_id = 'shift-wed-pm'").bind(runId));
+  if (nextStep === 2) statements.push(db.prepare("UPDATE care_demo_shifts SET assigned_caregiver_id = NULL, coverage_status = 'coverage_needed', disruption_reason = 'Maya called out sick at 2:15 PM', version = version + 1 WHERE run_id = ? AND shift_id = 'shift-wed-pm'").bind(runId));
   await db.batch(statements);
   return json({ state: await loadCareState(db, runId), advanced_to_step: nextStep, external_side_effect: false });
 }
@@ -540,7 +640,7 @@ async function prepareAssignmentOrientation(db: D1Database, runId: string, body:
   const parsed = prepareAssignmentOrientationArgsSchema.safeParse(body);
   if (!parsed.success) return json({ error: "Invalid orientation request." }, 400);
   const state = await loadCareState(db, runId);
-  if (!state?.care_team_day || state.care_team_day.step < 2) return json({ error: "Walter's readiness review is not active yet." }, 409);
+  if (!state?.care_team_day || state.care_team_day.step < 1) return json({ error: "Walter's readiness review is not active yet." }, 409);
   const resident = resolveTeamResidentRef(state, parsed.data.resident_ref);
   if (resident !== "walter-demo" || parsed.data.caregiver_id !== "caregiver-elena") return json({ error: "This simulation only permits Walter's orientation packet for Elena." }, 409);
   const duplicate = await db.prepare("SELECT * FROM care_demo_orientation_packets WHERE run_id = ? AND idempotency_key = ?").bind(runId, parsed.data.idempotency_key).first<DbOrientationPacket>();
@@ -668,11 +768,14 @@ async function startShift(db: D1Database, runId: string, shiftId: string, body: 
 
 async function completeShift(db: D1Database, runId: string, shiftId: string, body: Record<string, unknown>) {
   const caregiverId = typeof body.caregiver_id === "string" ? body.caregiver_id : "";
-  const shift = await db.prepare("SELECT * FROM care_demo_shifts WHERE run_id = ? AND shift_id = ?").bind(runId, shiftId).first<DbShift>();
-  if (!shift) return json({ error: "Shift not found." }, 404);
+  const [shift, run] = await Promise.all([
+    db.prepare("SELECT * FROM care_demo_shifts WHERE run_id = ? AND shift_id = ?").bind(runId, shiftId).first<DbShift>(),
+    db.prepare("SELECT * FROM care_demo_runs WHERE run_id = ?").bind(runId).first<DbRun>()
+  ]);
+  if (!shift || !run) return json({ error: "Shift not found." }, 404);
   if (shift.assigned_caregiver_id === caregiverId && shift.visit_status === "completed") return json({ state: await loadCareState(db, runId), already_completed: true, external_side_effect: false });
   if (shift.assigned_caregiver_id !== caregiverId || shift.visit_status !== "in_progress") return json({ error: "The assigned caregiver must have an active visit before completing it." }, 409);
-  const completedAt = "2026-09-02T20:02:00-04:00";
+  const completedAt = run.scenario === "care_team_day" ? "2026-09-02T19:37:00-04:00" : "2026-09-02T20:02:00-04:00";
   await db.batch([
     db.prepare("INSERT INTO care_demo_visit_events (run_id, visit_event_id, shift_id, caregiver_id, event_type, summary, detail, occurred_at, evidence_class) VALUES (?, ?, ?, ?, 'routine_completed', 'Evening routine completed', 'Jordan recorded completion of the expected non-clinical evening routine.', '2026-09-02T19:35:00-04:00', 'caregiver_attestation')").bind(runId, `visit_${crypto.randomUUID()}`, shiftId, caregiverId),
     db.prepare("INSERT INTO care_demo_visit_events (run_id, visit_event_id, shift_id, caregiver_id, event_type, summary, detail, occurred_at, evidence_class) VALUES (?, ?, ?, ?, 'meal_delivered', 'Meal delivery acknowledged', 'The scheduled meal delivery was acknowledged during the visit.', '2026-09-02T18:10:00-04:00', 'caregiver_attestation')").bind(runId, `visit_${crypto.randomUUID()}`, shiftId, caregiverId),
@@ -937,6 +1040,11 @@ export async function handleApi(request: Request, env: Env) {
   if (request.method === "POST" && actionMatch) return resolveAction(env.DB, runId, decodeURIComponent(actionMatch[1]), await readJson(request));
   if (request.method === "POST" && path === "/api/care/device-health-snapshots") return requestDeviceHealthSnapshot(env.DB, runId, await readJson(request));
   if (request.method === "POST" && path === "/api/care/team-overview") return getCareTeamOverview(env.DB, runId, await readJson(request));
+  if (request.method === "POST" && path === "/api/care/team-inquiries") return prepareTeamInquiry(env.DB, runId, await readJson(request));
+  const teamInquiryResolveMatch = path.match(/^\/api\/care\/team-inquiries\/([^/]+)\/resolve$/);
+  if (request.method === "POST" && teamInquiryResolveMatch) return resolveTeamInquiry(env.DB, runId, decodeURIComponent(teamInquiryResolveMatch[1]), await readJson(request));
+  const teamInquiryCloseMatch = path.match(/^\/api\/care\/team-inquiries\/([^/]+)\/close$/);
+  if (request.method === "POST" && teamInquiryCloseMatch) return closeTeamInquiry(env.DB, runId, decodeURIComponent(teamInquiryCloseMatch[1]));
   if (request.method === "POST" && path === "/api/care/team-day/advance") return advanceCareTeamDay(env.DB, runId);
   if (request.method === "POST" && path === "/api/care/orientation-packets") return prepareAssignmentOrientation(env.DB, runId, await readJson(request));
   const orientationAcknowledgeMatch = path.match(/^\/api\/care\/orientation-packets\/([^/]+)\/acknowledge$/);

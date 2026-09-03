@@ -19,6 +19,7 @@ import {
   prepareCaregiverCheckInArgsSchema,
   prepareCareTeamReviewArgsSchema,
   prepareResidentCheckInArgsSchema,
+  prepareTeamInquiryArgsSchema,
   requestDeviceHealthSnapshotArgsSchema,
   toolInputSchemas,
   type CareState
@@ -50,8 +51,10 @@ export function expectedToolNames(state: CareState | null, workspace: WebMCPWork
   if (state.resident.scenario === "care_team_day") {
     if (workspace === "resident") return ["get_care_overview", "get_medication_schedule", "get_resident_context"];
     const names = ["get_care_team_overview", "get_resident_context", "get_shift_context"];
+    const evelynInquiry = state.care_team_day?.inquiries.find((inquiry) => inquiry.resident_id === "evelyn-demo" && inquiry.inquiry_type === "visit_verification");
+    if ((state.care_team_day?.step ?? 0) === 0 && !evelynInquiry) names.push("prepare_team_inquiry");
     const walterPacket = state.care_team_day?.orientation_packets.find((packet) => packet.resident_id === "walter-demo");
-    if ((state.care_team_day?.step ?? 0) >= 2 && !walterPacket) names.push("prepare_assignment_orientation");
+    if ((state.care_team_day?.step ?? 0) >= 1 && !walterPacket) names.push("prepare_assignment_orientation");
     const roseShift = state.shifts.find((item) => item.id === "shift-wed-pm");
     if (roseShift?.coverage_status === "coverage_needed") names.push("get_coverage_candidates", "prepare_shift_coverage");
     if (roseShift?.assigned_caregiver_id && roseShift.assigned_caregiver_id !== "caregiver-maya" && roseShift.visit_status !== "completed") names.push("get_changes_since_last_shift", "get_shift_brief");
@@ -202,9 +205,15 @@ export function useWebMCPTools(actions: CareActions, state: CareState | null, wo
     } satisfies WebMCPTool,
     careTeamOverview: {
       name: "get_care_team_overview", title: "Get care-team day overview",
-      description: "Start a care-coordinator handoff by reading all three residents, the deterministic operational attention queue, deadlines, sources, known facts, unknowns, human owners, and the next simulated event. This is not medical prioritization.",
+      description: "Read the current time block, its single focused decision, completed history, known facts, unknowns, human owners, and the explicit gate blocking simulated-time advancement. This is operational coordination, not medical prioritization.",
       inputSchema: toolInputSchemas.getCareTeamOverview, annotations: { ...baseAnnotations, readOnlyHint: true },
       async execute(args: unknown) { parseArgs(getCareTeamOverviewArgsSchema, args); return actions.getCareTeamOverview(); }
+    } satisfies WebMCPTool,
+    teamInquiry: {
+      name: "prepare_team_inquiry", title: "Prepare caregiver status inquiry",
+      description: "Stage a bounded check-in to Evelyn's assigned caregiver, Luis, to investigate missing visit-verification evidence. It does not claim he is absent and sends nothing until the coordinator approves the visible draft.",
+      inputSchema: toolInputSchemas.prepareTeamInquiry, annotations: baseAnnotations,
+      async execute(args: unknown) { return actions.prepareTeamInquiry(parseArgs(prepareTeamInquiryArgsSchema, args)); }
     } satisfies WebMCPTool,
     assignmentOrientation: {
       name: "prepare_assignment_orientation", title: "Prepare assignment orientation",
@@ -265,9 +274,10 @@ export function useWebMCPTools(actions: CareActions, state: CareState | null, wo
     useWebMCPTool(enabled.has(tools.shiftBrief.name) ? tools.shiftBrief : null),
     useWebMCPTool(enabled.has(tools.shiftHandoff.name) ? tools.shiftHandoff : null),
     useWebMCPTool(enabled.has(tools.careTeamOverview.name) ? tools.careTeamOverview : null),
+    useWebMCPTool(enabled.has(tools.teamInquiry.name) ? tools.teamInquiry : null),
     useWebMCPTool(enabled.has(tools.assignmentOrientation.name) ? tools.assignmentOrientation : null)
   ];
-  const orderedTools = [tools.overview, tools.schedule, tools.inventory, tools.devices, tools.evidence, tools.context, tools.story, tools.residentCheckIn, tools.prepare, tools.deviceHealth, tools.careTeamReview, tools.shiftContext, tools.coverageCandidates, tools.prepareCoverage, tools.changesSinceLastShift, tools.shiftBrief, tools.shiftHandoff, tools.careTeamOverview, tools.assignmentOrientation];
+  const orderedTools = [tools.overview, tools.schedule, tools.inventory, tools.devices, tools.evidence, tools.context, tools.story, tools.residentCheckIn, tools.prepare, tools.deviceHealth, tools.careTeamReview, tools.shiftContext, tools.coverageCandidates, tools.prepareCoverage, tools.changesSinceLastShift, tools.shiftBrief, tools.shiftHandoff, tools.careTeamOverview, tools.teamInquiry, tools.assignmentOrientation];
   const activeRegistrations = registrations.filter((_, index) => enabled.has(orderedTools[index].name));
   return { supported: registrations.some((item) => item.supported), registered: activeRegistrations.length > 0 && activeRegistrations.every((item) => item.registered), error: activeRegistrations.find((item) => item.error)?.error ?? null, count: activeRegistrations.filter((item) => item.registered).length, availableNames };
 }

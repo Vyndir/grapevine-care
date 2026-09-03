@@ -2,126 +2,107 @@
 
 ## What to evaluate first
 
-Grapevine Care models caregiver continuity, not an AI medication dispenser. The
-default call-out scenario demonstrates the complete job:
+Grapevine Care models the caregiver coordinator's day—not an AI medication
+dispenser and not a collection of disconnected scenarios.
 
 ```text
-disruption → constraints → scheduler approval → incoming brief
-→ visit evidence → outgoing approval → recipient acknowledgement
+observe → investigate → prepare → human decision → document → advance
 ```
 
-The agent contributes cross-system context, deterministic explanations, and
-prepared drafts. People retain assignment, visit, handoff, and clinical
-authority.
+The page presents one focused decision at a time. The simulated clock cannot move
+until that decision is resolved, escalated, deferred with a reason, or waiting on
+an identified person. No open question is silently resolved by advancing time.
 
-## Recommended WebMCP test environment
+## Recommended WebMCP environment
 
-- Latest ChatGPT desktop app.
-- ChatGPT's built-in browser with **Enable site tools** turned on under Browser
-  settings → Permissions.
-- An account and selected model that support Site Tools.
-- Keep the Grapevine Care page open; page-scoped tools are available only while
-  their page is open.
+- Latest ChatGPT desktop app
+- Built-in browser with **Enable site tools** on under Browser settings → Permissions
+- An account and selected model that support Site Tools
+- Grapevine Care kept open while using its page-scoped tools
 
-Open the address-bar Site Tools menu before the prompt. In the initial call-out
-state, expect six tools:
+Open the address-bar Site Tools menu. In the initial 9:15 AM block, expect:
 
 ```text
-get_resident_context       get_care_story
-get_care_evidence          get_shift_context
-get_coverage_candidates    prepare_shift_coverage
+get_care_team_overview   get_resident_context
+get_shift_context       prepare_team_inquiry
 ```
 
-Nineteen tools exist across the complete application. Grapevine deliberately
-offers only four persistent caregiver-context reads plus the currently valid
-workflow tools. The capability chip on the main caregiver page mirrors this
-expected set.
+The capability chip mirrors the active tool set. Consequential tools are removed
+when their workflow is no longer valid.
 
-## Two-minute interactive verification
+## Primary interactive verification
 
-1. Open the live site on **Caregiver call-out**.
-2. Ask: “Rose's 5 PM caregiver called out. Determine who is eligible to cover
-   the shift, explain every candidate against the explicit constraints, and prepare the eligible option for scheduler
-   review. Do not assign anyone or use an opaque score.”
-3. Confirm the agent begins with `get_shift_context({})`—without an internal
-   shift ID—then uses `get_coverage_candidates` and `prepare_shift_coverage`.
-4. Confirm only Jordan is eligible and the visible drawer says the schedule has
-   not changed.
-5. Approve the assignment. Confirm coverage tools disappear and
-   `get_changes_since_last_shift` / `get_shift_brief` appear.
-6. Open **My shift**, acknowledge the brief, and complete the compressed visit.
-7. Confirm `prepare_shift_handoff` appears only now.
-8. Prepare and approve the handoff, then acknowledge it as Luis in the visible
-   UI. No agent acknowledgement tool exists.
+Ask:
 
-## Advanced multi-resident verification
+> I am taking over the care coordinator desk. Tell me what needs attention now,
+> investigate what is unknown, and prepare the next safe step for my review.
 
-Open **Explore Care Team Day** from the primary demo—or use the shareable
-`?scenario=care_team_day` URL—and ask:
+### 9:15 AM — Evelyn verification inquiry
 
-> I’m taking over the care coordinator desk. Catch me up and help me get
-> everyone through today.
+1. `get_care_team_overview` identifies one focused decision: Evelyn's visit has no
+   verification record. It must not claim that Luis is absent or Evelyn is unsafe.
+2. `prepare_team_inquiry` stages a bounded status-and-ETA question. Nothing is sent.
+3. Approve it in the coordinator-only interface.
+4. Luis's explicit simulated response arrives as caregiver self-report, not EVV.
+5. Record the disposition. Only then does the advance gate open.
 
-The initial page exposes `get_care_team_overview`, `get_resident_context`, and
-`get_shift_context`. The overview must distinguish operational deadlines from
-medical severity and return a source, policy basis, known facts, unknowns, and a
-human owner for each queue item.
+### 11:30 AM — Walter assignment readiness
 
-Use **Advance simulated time** to move through the seven deterministic
-milestones. The global **Scenario guide** maps every scenario to a suggested
-prompt and the capability boundary it demonstrates.
+1. Advance time. Walter becomes the single focused decision.
+2. Ask whether Elena is ready for Walter's visit.
+3. The agent identifies missing resident-specific orientation and Care Plan v2
+   acknowledgement, then prepares the packet.
+4. Elena acknowledges it in the human-only interface. The agent cannot do so.
 
-1. Ask “Has Luis shown up for Evelyn?” The answer must say no verification
-   record has arrived—not that Luis is absent or Evelyn is unsafe.
-2. Advance once. The simulated EVV record resolves the gap without an agent
-   action.
-3. Advance to Walter’s readiness review. `prepare_assignment_orientation`
-   appears and may prepare Care Plan v2 context for Elena, but it cannot record
-   completion.
-4. Confirm the preparation tool disappears while the packet waits. Acknowledge
-   as Elena in the visible UI; only then does Walter’s readiness resolve.
-5. Advance to 2:15 PM. Rose’s call-out enters the existing coverage workflow.
+### 2:15 PM — Rose coverage recovery
+
+1. Advance time. Maya's call-out enters the day as the next decision.
+2. Ask the agent to evaluate all candidates and prepare the eligible option.
+3. Confirm the server reports the same named constraints for every candidate and
+   no opaque suitability score.
+4. The scheduler—not the agent—approves Jordan.
+
+Continue through the 5:00 PM visit, 7:35 PM completion, and 8:00 PM handoff. The
+incoming caregiver reviews context; observations remain bounded; Jordan approves
+the handoff; Luis acknowledges it.
+
+## Failure conditions judges should try
+
+- Click **Advance** before closing Evelyn's inquiry: the server returns a blocked
+  gate with the exact remaining requirement.
+- Ask “Did Luis fail to show up?” before inquiry evidence exists: the correct
+  answer is that presence is unknown.
+- Try to assign an ineligible caregiver: the server rejects it.
+- Reuse a stale schedule or evidence snapshot: preparation fails closed.
+- Try to have the agent acknowledge Walter's packet or Luis's handoff: no such
+  WebMCP capability exists.
 
 ## Fast source review
 
 | Question | File |
 | --- | --- |
-| Where are tools registered dynamically? | `src/useWebMCPTools.ts` |
-| Where are schemas and JSON Schema inputs defined? | `src/schemas.ts` |
-| Where are server invariants enforced? | `src/server.ts` |
-| Where is the caregiver-first UI? | `src/CoverageCaregiverView.tsx` |
-| Where is the multi-resident day? | `src/CareTeamDayView.tsx`, `drizzle/0006_care_team_day.sql` |
-| Where is continuity state stored? | `drizzle/0005_caregiver_continuity_loop.sql` |
-| Which behaviors are executable tests? | `src/server.test.ts`, `src/App.test.tsx`, `src/schemas.test.ts` |
-| What can never happen? | `docs/SAFETY.md` |
-| How is this separate from Project Grapevine? | `PROJECT_ORIGIN.md` |
-
-Run the complete verification suite with `pnpm run verify`.
-
-## Key implementation claims
-
-- Nineteen total WebMCP tools; safe caregiver-context reads remain
-  discoverable during the call-out while consequential tools follow state.
-- Six tools are dedicated to caregiver continuity.
-- Eight deterministic candidate checks; zero opaque suitability scores.
-- Evidence and schedule snapshots fail closed when state changes.
-- Preparation is idempotent and no demo workflow has an external side effect.
-- Operational handoffs and nurse review are separate data models, tools, and
-  approval paths.
-- All data is fictional and isolated by browser-run ID.
+| Dynamic tool registration | `src/useWebMCPTools.ts` |
+| Schemas and JSON Schema inputs | `src/schemas.ts` |
+| Server invariants and advance gate | `src/server.ts` |
+| Time-led day UI | `src/CareTeamDayView.tsx` |
+| Inquiry persistence | `drizzle/0007_inquiry_driven_day.sql` |
+| Multi-resident state | `drizzle/0006_care_team_day.sql` |
+| Caregiver continuity state | `drizzle/0005_caregiver_continuity_loop.sql` |
+| Executable behavior | `src/server.test.ts`, `src/App.test.tsx`, `src/schemas.test.ts` |
+| Safety boundaries | `docs/SAFETY.md` |
+| Source separation | `PROJECT_ORIGIN.md` |
 
 ## Challenge-criteria loop
 
 | Criterion | Evidence in this build |
 | --- | --- |
-| WebMCP leverage | Cross-system caregiver work spans a deterministic care-team overview, resident drill-down, coverage, readiness, briefing, and handoff; schemas, freshness, and human gates are part of the interaction rather than prompt prose |
-| Execution | Complete D1-backed state machines, deterministic reset and time progression, responsive UI, version conflicts, idempotency, and 32 passing tests |
-| Potential impact | Addresses a concrete continuity failure: safe coverage recovery and context transfer when care changes hands |
-| Creativity and ambition | Combines agents, caregiver operations, resident context, visit evidence, human approvals, and extensible device adapters without turning AI into a clinical or workforce authority |
+| WebMCP leverage | Natural questions drive stateful reads, bounded preparation, visible human decisions, fresh rereads, and context-dependent capability changes |
+| Execution | D1-backed state machines, deterministic reset, server-enforced time gates, inquiry provenance, version conflicts, idempotency, and automated tests |
+| Potential impact | Addresses missed verification, readiness gaps, schedule disruption, replacement briefing, and handoff loss in one coherent caregiver workday |
+| Creativity and ambition | Combines agents, caregivers, residents, schedules, evidence, and device adapters without transferring clinical or workforce authority to AI |
 
 ## Scope honesty
 
-This is a reliable competition simulation, not production healthcare software.
-It has no identity provider, protected health information, real caregiver
-dispatch, electronic health record, pharmacy, medical-device, or emergency-
-service integration. Production prerequisites are listed in `docs/SAFETY.md`.
+This is a reliable competition simulation, not production healthcare software. It
+has no identity provider, protected health information, real dispatch, electronic
+health record, pharmacy, medical-device, or emergency-service integration.

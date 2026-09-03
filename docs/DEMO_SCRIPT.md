@@ -1,92 +1,64 @@
 # Three-minute demo script
 
-## 0:00–0:15 — The caregiver's real problem
+## 0:00–0:20 — A day, not a dashboard
 
-Open the public site on the default **Caregiver call-out** scenario.
+Open Grapevine Care. The large clock reads **9:15 AM · Morning verification**.
 
-Point out the **Agent tools · 6 active** chip. The initial surface combines four
-safe context reads with two workflow-specific coverage tools.
+“A caregiver coordinator does not need seven disconnected demos. They need to
+know what requires attention now, what is actually known, and what must happen
+before the day can safely move forward.”
 
-“It is 2:15 PM. Maya just called out for Rose's 5:00 PM visit. Care does not
-pause, and the replacement caregiver cannot arrive without the context the shift
-requires.”
+Show the focused decision and closed advance gate.
 
-Show the six-step continuity loop and the explicit scheduler authority.
+## 0:20–0:55 — Investigate uncertainty with WebMCP
 
-## 0:15–0:48 — WebMCP resolves coverage safely
+Ask:
 
-Ask ChatGPT:
+> What needs my attention now? Tell me what is known and unknown, then prepare the
+> safest next step for my review.
 
-> Rose's 5 PM shift lost coverage. Use this page's tools to inspect the shift,
-> evaluate every caregiver against the explicit constraints, explain every
-> exclusion and tradeoff, and prepare the eligible option for scheduler review.
-> Do not assign anyone, use an opaque score, or infer suitability from sensitive
-> traits.
+Show `get_care_team_overview` and `prepare_team_inquiry`. Emphasize: there is no
+visit-verification record, but the app does not claim Luis is absent.
 
-Show `get_shift_context({})`, `get_coverage_candidates`, and
-`prepare_shift_coverage`. Point out that Jordan is the only eligible option;
-Maya is unavailable, Luis lacks a feasible travel window, and Elena lacks Rose
-orientation and Care Plan v4 acknowledgement.
+## 0:55–1:20 — Evidence closes the loop
 
-## 0:48–1:05 — A person changes the schedule
+Approve the prepared inquiry. Luis supplies an explicit simulated self-report:
+he arrived, but his EVV app failed. Record the disposition.
 
-The scheduler drawer opens. Show:
+“This is not a surprise revealed by the clock. It is a question, an answer with a
+clear evidence class, and an accountable human closure.”
 
-- all eight deterministic checks passed;
-- the 39/40-hour workload tradeoff is visible;
-- no assignment changed and no caregiver was contacted.
+Advance to 11:30 AM.
 
-Approve Jordan in the human-only UI. The coverage tools disappear; safe context
-reads remain and assignment-bound briefing tools replace the coverage actions.
+## 1:20–1:48 — Readiness follows the person
 
-## 1:05–1:38 — “Since you were last here”
+Ask whether Elena is ready for Walter's visit. Show that availability alone is
+insufficient: Walter-specific orientation and Care Plan v2 acknowledgement are
+missing. Let WebMCP prepare the packet; Elena acknowledges it herself.
 
-Open **My shift**. Show:
+Advance to 2:15 PM.
 
-- Rose as a person, not an alert;
-- Care Plan v4 and changes since Jordan's last visit;
-- what matters today;
-- the unresolved nurse review;
-- explicit “do not infer” boundaries.
+## 1:48–2:25 — Recover coverage without losing context
 
-“The agent assembles context across systems. It does not invent care instructions
-or decide that a clinical event occurred.”
+Ask:
 
-Jordan acknowledges the brief and starts the simulated visit. Explain that the
-check-in is simulated EVV evidence; a missing check-in would not prove absence.
+> Maya called out. Evaluate the available caregivers against every explicit
+> constraint and prepare the eligible replacement for scheduler review.
 
-## 1:38–2:05 — The shift produces bounded evidence
+Show deterministic exclusions, Jordan as the eligible option, and the scheduler
+approval. Point out that the agent prepares; the person changes the schedule.
 
-Complete the compressed visit. Show the recorded facts:
+## 2:25–2:48 — The rest of the shift remains accountable
 
-- evening routine completed;
-- meal delivery acknowledged;
-- Rose asked for a later dinner;
-- no cause or clinical meaning inferred.
+Use the progress rail to preview the remaining stages: incoming brief at 5:00 PM,
+bounded visit evidence at 7:35 PM, and outgoing approval plus recipient
+acknowledgement at 8:00 PM. Mention that each later block is subject to the same
+advance gate and human-authority rule.
 
-`prepare_shift_handoff` now becomes available. It was not present before the
-visit was complete.
+Open **How WebMCP works** and show the state-dependent capability set and device
+adapter boundary.
 
-## 2:05–2:31 — Context reaches the next caregiver
-
-Prepare the handoff to Luis. Show that the outgoing caregiver must approve and
-Luis has no access to the draft. Approve as Jordan, open **Handoff**, and
-acknowledge as Luis.
-
-The loop now reads entirely complete:
-
-`disruption → constraints → approval → brief → visit → handoff`
-
-## 2:31–2:50 — WebMCP and device boundaries
-
-Open **How WebMCP works**. Show the state-dependent tool list and
-`grapevine.care.device.v1` adapter.
-
-“The same architecture can accept evidence from future equipment, but a device
-adapter cannot add executable tools, release medication, or transfer clinical
-authority to the agent.”
-
-## 2:50–2:59 — Close
+## 2:48–2:59 — Close
 
 “Care doesn't happen in one shift. Grapevine makes sure context doesn't end when
 the shift does.”
@@ -94,20 +66,9 @@ the shift does.”
 ## Recording checklist
 
 - Keep the final video under three minutes.
-- Show a real WebMCP call within the first 30 seconds and use the Site Tools
-  activity UI to prove invocation.
+- Show a real WebMCP call within the first 30 seconds and Site Tools activity.
 - Record at 1080p with readable browser zoom and clear audio.
-- Show the deployed URL, real tool calls, and both human approval gates.
+- Show the deployed URL, the closed gate, and at least two human decisions.
 - Use no protected health information, private data, third-party music, or
   unauthorized logos.
 - Upload publicly to YouTube and add the link to Devpost.
-
-## Optional advanced judge walkthrough
-
-After the primary video path, judges can open **Explore Care Team Day** and ask:
-“I’m taking over the care coordinator desk. Catch me up and help me get everyone
-through today.” The compressed timeline demonstrates three distinct needs:
-Evelyn’s missing EVV record resolves from later evidence, Walter’s onboarding
-packet remains incomplete until Elena acknowledges it, and Rose’s 2:15 PM
-call-out activates the existing continuity loop. This is the deeper live-test
-path; do not crowd all seven steps into the required sub-three-minute video.

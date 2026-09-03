@@ -19,10 +19,11 @@ Medical and emergency decisions: outside the product
 
 ## Multi-resident care-team layer
 
-Migration `0006_care_team_day.sql` adds a seven-step persisted simulation and
-idempotent orientation packets. It intentionally models exactly three distinct
-operational problems: Evelyn’s absent visit-verification record, Walter’s
-resident-specific onboarding gap, and Rose’s later coverage disruption.
+Migrations `0006_care_team_day.sql` and `0007_inquiry_driven_day.sql` add a
+six-block persisted simulation, idempotent orientation packets, and explicit
+team inquiries. They model exactly three distinct operational problems: Evelyn’s
+missing visit-verification evidence, Walter’s resident-specific onboarding gap,
+and Rose’s later coverage disruption.
 
 `get_care_team_overview` is the portfolio-level read. The server—not the
 language model—constructs each queue item’s deadline, source, policy basis,
@@ -31,16 +32,24 @@ medical triage. `resident_ref` resolves exact names or IDs and fails on unknown
 or ambiguous references.
 
 ```text
-9:15 Evelyn: EVV record missing; presence unknown
-10:30 EVV record arrives; gap resolves without agent intervention
+09:15 Evelyn: verification missing; presence unknown
+      → agent prepares inquiry → coordinator sends → Luis responds
+      → coordinator records disposition
 11:30 Walter: orientation and Care Plan v2 acknowledgement due
       → agent prepares packet → Elena acknowledges in human UI
 14:15 Rose: Maya calls out → existing coverage workflow activates
 17:00 replacement visit → 19:35 completion → 20:00 handoff
 ```
 
-The “Advance simulated time” control changes persisted simulated time and evidence. It never
-contacts a real person or silently completes a human task.
+The “Advance simulated time” control changes persisted simulated time only after
+the server's advance gate confirms the current decision is accounted for. It
+never reveals the answer to an open question, contacts a real person, or silently
+completes a human task. The coordinator receives the exact blocking requirement.
+
+`care_demo_team_inquiries` preserves the investigation chain: the source gap,
+bounded question, approval state, response code, response evidence class, and
+human closure. The seeded Luis response is explicitly a caregiver self-report;
+it does not become an independent EVV record.
 
 ## Longitudinal care layer
 

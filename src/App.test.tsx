@@ -64,13 +64,27 @@ function installFetch() {
       if (body.scenario === "coverage_callout") state = { ...structuredClone(baseState), resident: { ...baseState.resident, scenario: "coverage_callout", severity: "attention", simulated_time: "2026-09-02T14:15:00-04:00" } };
       if (body.scenario === "missed_window") state = { ...state, evidence_version: 1, resident: { ...state.resident, scenario: "missed_window", severity: "attention" }, doses: state.doses.map((dose, index) => index === 0 ? { ...dose, status: "missed" } : dose), resident_check_ins: [], actions: [], events: [{ ...state.events[0], id: "evt-missed", severity: "attention", summary: "Medication window elapsed" }, ...state.events] };
       if (body.scenario === "care_story") state = { ...state, evidence_version: 1, resident: { ...state.resident, scenario: "care_story", severity: "attention", simulated_time: "2026-09-02T09:42:00-04:00" }, doses: state.doses.map((dose, index) => index === 0 ? { ...dose, status: "missed" } : dose), resident_check_ins: [{ id: "story-check-in", resident_id: "rose-demo", prompt: "Are you okay?", status: "responded", response_code: "im_okay", evidence_snapshot_id: "historical-story-snapshot", idempotency_key: "historical-story-check-in", created_at: "2026-09-01T09:12:00-04:00", responded_at: "2026-09-01T09:14:00-04:00" }], actions: [], handoffs: [], care_story: { ...state.care_story, horizon_hours: 72, starts_at: "2026-08-31T07:00:00-04:00", ends_at: "2026-09-02T09:42:00-04:00", routine_confirmations: 3, unconfirmed_windows: 2, resident_check_ins: 1, routine_activity_signals: 2, summary: "Rose’s routine was largely consistent across three days. Two care-plan signals now require human review.", unresolved: ["Whether either unconfirmed window reflects medication ingestion"], baseline_comparisons: [{ signal: "Morning activity", baseline: "Usually begins by 7:30 AM", observed: "First movement at 9:31 AM", interpretation: "Person-specific change; cause unknown", evidence_status: "changed" }] }, events: [{ ...state.events[0], id: "story-current", event_type: "medication_window_unconfirmed", severity: "attention", summary: "Second monitoring-plan signal in 72 hours", detail: "A second morning medication window lacks confirmation." }, ...state.events] };
-      if (body.scenario === "care_team_day") state = { ...structuredClone(baseState), resident: { ...baseState.resident, scenario: "care_team_day", severity: "attention", simulated_time: "2026-09-02T09:15:00-04:00" }, care_team_day: { step: 0, step_label: "Evelyn verification gap", next_event_label: "Evelyn check-in arrives", timeline: [{ step: 0, time: "9:15 AM", label: "Evelyn verification gap" }, { step: 1, time: "10:30 AM", label: "Evelyn check-in arrives" }, { step: 2, time: "11:30 AM", label: "Walter readiness review" }, { step: 3, time: "2:15 PM", label: "Rose caregiver call-out" }], residents: [{ id: "rose-demo", display_name: "Rose", age: 79, care_plan_version: "v4", support_setting: "Independent living", headline: "Evening visit currently covered", status: "routine", preferences: ["Call before visiting"], context: ["Mild memory difficulties"] }, { id: "walter-demo", display_name: "Walter", age: 84, care_plan_version: "v2", support_setting: "In-home support", headline: "Orientation needed", status: "attention", preferences: ["Use written reminders"], context: ["Uses a walker"] }, { id: "evelyn-demo", display_name: "Evelyn", age: 81, care_plan_version: "v3", support_setting: "Assisted living", headline: "Visit verification not received", status: "attention", preferences: ["Quiet morning routine"], context: ["Morning support visit"] }], attention_queue: [{ id: "attention-evelyn", resident_id: "evelyn-demo", resident_name: "Evelyn", state: "attention_now", attention_reason: "Scheduled visit began without a verification record", deadline: "Review now", source: "EVV adapter", policy_basis: "Visit verification policy", known: ["Luis is assigned"], unknown: ["Whether Luis is physically absent"], human_owner: "Care coordinator" }, { id: "attention-walter", resident_id: "walter-demo", resident_name: "Walter", state: "due_later", attention_reason: "Assignment readiness incomplete", deadline: "Before 1 PM", source: "Training registry", policy_basis: "Orientation required", known: ["Elena is available"], unknown: ["Orientation incomplete"], human_owner: "Elena" }], orientation_packets: [] }, shifts: [...structuredClone(baseState.shifts).map((shift) => shift.id === "shift-wed-pm" ? { ...shift, assigned_caregiver_id: "caregiver-maya", coverage_status: "covered" as const, disruption_reason: null } : shift), { id: "shift-evelyn-am", resident_id: "evelyn-demo", starts_at: "2026-09-02T09:00:00-04:00", ends_at: "2026-09-02T12:00:00-04:00", required_role: "home_care_aide", required_orientation_plan_version: "v3", original_caregiver_id: "caregiver-luis", assigned_caregiver_id: "caregiver-luis", next_caregiver_id: null, coverage_status: "covered", visit_status: "in_progress", handoff_status: "not_ready", disruption_reason: null, version: 1 }] };
+      if (body.scenario === "care_team_day") state = { ...structuredClone(baseState), resident: { ...baseState.resident, scenario: "care_team_day", severity: "attention", simulated_time: "2026-09-02T09:15:00-04:00" }, care_team_day: { step: 0, step_label: "Morning verification", next_event_label: "Assignment readiness", timeline: [{ step: 0, time: "9:15 AM", label: "Morning verification" }, { step: 1, time: "11:30 AM", label: "Assignment readiness" }, { step: 2, time: "2:15 PM", label: "Coverage recovery" }, { step: 3, time: "5:00 PM", label: "Replacement visit" }], residents: [{ id: "rose-demo", display_name: "Rose", age: 79, care_plan_version: "v4", support_setting: "Independent living", headline: "Evening visit currently covered", status: "routine", preferences: ["Call before visiting"], context: ["Mild memory difficulties"] }, { id: "walter-demo", display_name: "Walter", age: 84, care_plan_version: "v2", support_setting: "In-home support", headline: "Orientation needed", status: "routine", preferences: ["Use written reminders"], context: ["Uses a walker"] }, { id: "evelyn-demo", display_name: "Evelyn", age: 81, care_plan_version: "v3", support_setting: "Assisted living", headline: "Visit verification not received", status: "attention", preferences: ["Quiet morning routine"], context: ["Morning support visit"] }], attention_queue: [{ id: "attention-evelyn", resident_id: "evelyn-demo", resident_name: "Evelyn", state: "attention_now", attention_reason: "Scheduled visit began without a verification record", deadline: "Review now", source: "EVV adapter", policy_basis: "Visit verification policy", known: ["Luis is assigned"], unknown: ["Whether Luis is physically absent"], human_owner: "Care coordinator" }], orientation_packets: [], inquiries: [], advance_gate: { allowed: false, blockers: ["Investigate Evelyn’s missing verification record."], requirement: "Address the current block first." } }, shifts: [...structuredClone(baseState.shifts).map((shift) => shift.id === "shift-wed-pm" ? { ...shift, assigned_caregiver_id: "caregiver-maya", coverage_status: "covered" as const, disruption_reason: null } : shift), { id: "shift-evelyn-am", resident_id: "evelyn-demo", starts_at: "2026-09-02T09:00:00-04:00", ends_at: "2026-09-02T12:00:00-04:00", required_role: "home_care_aide", required_orientation_plan_version: "v3", original_caregiver_id: "caregiver-luis", assigned_caregiver_id: "caregiver-luis", next_caregiver_id: null, coverage_status: "covered", visit_status: "in_progress", handoff_status: "not_ready", disruption_reason: null, version: 1 }] };
       return Response.json({ state });
     }
     if (url === "/api/care/team-overview") return Response.json({ fictional: true, simulated_time: state.resident.simulated_time, step: state.care_team_day?.step, step_label: state.care_team_day?.step_label, residents: state.care_team_day?.residents, attention_queue: state.care_team_day?.attention_queue, next_event_label: state.care_team_day?.next_event_label, ordering_basis: "Deterministic deadlines; no medical severity", interpretation_boundary: "Missing evidence remains unknown." });
+    if (url === "/api/care/team-inquiries" && state.care_team_day) {
+      const inquiry = { id: "inquiry-evelyn-1", resident_id: "evelyn-demo" as const, caregiver_id: "caregiver-luis", inquiry_type: "visit_verification" as const, prompt: String(body.prompt), status: "awaiting_coordinator_approval" as const, response_code: null, response_detail: null, idempotency_key: String(body.idempotency_key), created_at: state.resident.simulated_time, responded_at: null, resolved_at: null };
+      state = { ...state, care_team_day: { ...state.care_team_day, inquiries: [inquiry], attention_queue: state.care_team_day.attention_queue.map((item) => item.resident_id === "evelyn-demo" ? { ...item, state: "waiting_on_human" as const } : item), advance_gate: { ...state.care_team_day.advance_gate, blockers: ["Approve the prepared check-in."] } } };
+      return Response.json({ inquiry, approval_required: true, external_side_effect: false });
+    }
+    if (url.includes("/api/care/team-inquiries/") && url.endsWith("/resolve") && state.care_team_day) {
+      state = { ...state, care_team_day: { ...state.care_team_day, inquiries: state.care_team_day.inquiries.map((item) => ({ ...item, status: "response_received" as const, response_code: "arrived_verification_failed" as const, response_detail: "Luis reports that he arrived at 9:08 AM and his EVV application failed.", responded_at: state.resident.simulated_time })), advance_gate: { ...state.care_team_day.advance_gate, blockers: ["Review Luis’s response and close the exception."] } } };
+      return Response.json({ state, response_received: true, external_side_effect: false });
+    }
+    if (url.includes("/api/care/team-inquiries/") && url.endsWith("/close") && state.care_team_day) {
+      state = { ...state, care_team_day: { ...state.care_team_day, inquiries: state.care_team_day.inquiries.map((item) => ({ ...item, status: "resolved" as const, resolved_at: state.resident.simulated_time })), attention_queue: state.care_team_day.attention_queue.map((item) => item.resident_id === "evelyn-demo" ? { ...item, state: "resolved" as const, attention_reason: "Luis confirmed arrival; the EVV failure was documented" } : item), advance_gate: { ...state.care_team_day.advance_gate, allowed: true, blockers: [] } } };
+      return Response.json({ state, external_side_effect: false });
+    }
     if (url === "/api/care/team-day/advance" && state.care_team_day) {
       const nextStep = state.care_team_day.step + 1;
-      state = { ...state, resident: { ...state.resident, simulated_time: nextStep === 1 ? "2026-09-02T10:30:00-04:00" : "2026-09-02T11:30:00-04:00" }, care_team_day: { ...state.care_team_day, step: nextStep, step_label: nextStep === 1 ? "Evelyn check-in arrives" : "Walter readiness review", next_event_label: nextStep === 1 ? "Walter readiness review" : "Rose caregiver call-out", attention_queue: state.care_team_day.attention_queue.map((item) => item.resident_id === "evelyn-demo" ? { ...item, state: "resolved" as const, attention_reason: "Luis's simulated visit check-in arrived" } : item) } };
+      const walterItem = { id: "attention-walter", resident_id: "walter-demo" as const, resident_name: "Walter", state: "waiting_on_human" as const, attention_reason: "Elena is available but not resident-specific assignment-ready", deadline: "Before the 1:00 PM visit", source: "Training registry", policy_basis: "Resident orientation required", known: ["Elena is available"], unknown: ["Orientation incomplete"], human_owner: "Elena" };
+      state = { ...state, resident: { ...state.resident, simulated_time: "2026-09-02T11:30:00-04:00" }, care_team_day: { ...state.care_team_day, step: nextStep, step_label: "Assignment readiness", next_event_label: "Coverage recovery", attention_queue: [...state.care_team_day.attention_queue, walterItem], advance_gate: { allowed: false, blockers: ["Elena must acknowledge Walter’s orientation."], requirement: "Address the current block first." } } };
       return Response.json({ state });
     }
     if (url === "/api/care/orientation-packets" && state.care_team_day) {
@@ -126,141 +140,50 @@ function installFetch() {
 
 beforeEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); window.history.replaceState({}, "", "/"); installFetch(); });
 
-function selectScenario(scenario: "on_schedule" | "missed_window" | "care_story" | "care_team_day") {
-  fireEvent.change(screen.getByLabelText("Demo scenario"), { target: { value: scenario } });
-}
-
 describe("Grapevine Care", () => {
-  it("opens with the caregiver job and keeps Rose's large-touch view one click away", async () => {
+  it("opens directly into one time-led Care Team Day without a permanent Rose tab", async () => {
     const tools = installModelContext();
     render(<App />);
-    expect(await screen.findByRole("heading", { name: "Keep Rose’s care moving—without losing context." })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Caregiver workspace" })).toHaveClass("active");
-    expect(within(screen.getByRole("navigation", { name: "Caregiver workflow views" })).getAllByRole("button").map((button) => button.textContent)).toEqual(["Today", "My shift", "Handoff"]);
-    expect(screen.getByRole("combobox", { name: "Demo scenario" })).toHaveValue("coverage_callout");
-    await waitFor(() => expect([...tools.keys()].sort()).toEqual(["get_care_evidence", "get_care_story", "get_coverage_candidates", "get_resident_context", "get_shift_context", "prepare_shift_coverage"]));
-    expect(screen.getByText("Agent tools · 6 active")).toBeInTheDocument();
-    const shiftContextSchema = tools.get("get_shift_context")!.inputSchema as { required?: string[] };
-    expect(shiftContextSchema.required ?? []).not.toContain("shift_id");
-    const shiftContext = await tools.get("get_shift_context")!.execute({}) as { resident_id: string; shift: { id: string }; schedule_snapshot_id: string; resolved_from: string };
-    expect(shiftContext).toMatchObject({ resident_id: "rose-demo", shift: { id: "shift-wed-pm" }, schedule_snapshot_id: "schedule-snapshot-bootstrap", resolved_from: "active_disrupted_shift" });
-    await expect(tools.get("get_shift_context")!.execute({ shift_id: "x" })).rejects.toThrow();
-    expect(tools.has("get_shift_context")).toBe(true);
-    selectScenario("on_schedule");
-    fireEvent.click(await screen.findByRole("button", { name: "Rose’s station" }));
-    expect(await screen.findByRole("heading", { name: "Good morning, Rose." })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Verify locally/i })).toBeEnabled();
-    await waitFor(() => expect(tools.size).toBe(7));
-    expect([...tools.keys()].sort()).toEqual(["get_care_evidence", "get_care_overview", "get_care_story", "get_inventory_forecast", "get_medication_schedule", "get_resident_context", "prepare_caregiver_check_in"]);
-    expect(screen.getByText(/Aug 29 · 7:42 PM/i)).toBeInTheDocument();
-    expect(screen.getByText("Test local attestation")).toBeInTheDocument();
+    expect((await screen.findAllByText("9:15 AM")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Morning verification").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Care Team Day" })).toHaveClass("active");
+    expect(screen.queryByRole("button", { name: "Rose’s station" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Demo scenario" })).not.toBeInTheDocument();
+    await waitFor(() => expect(tools.has("prepare_team_inquiry")).toBe(true));
   });
 
-  it("shows explicit uncertainty after the missed-window scenario", async () => {
+  it("blocks simulated time until the current decision is accounted for", async () => {
     render(<App />);
-    await screen.findByText("Keep Rose’s care moving—without losing context.");
-    selectScenario("missed_window");
-    expect(await screen.findByRole("heading", { name: "Rose’s care routine needs attention" })).toBeInTheDocument();
-    expect(screen.getByText(/without assuming ingestion/i)).toBeInTheDocument();
+    const tools = installModelContext();
+    const advance = await screen.findByRole("button", { name: /Advance to 11:30 AM/i });
+    expect(advance).toBeDisabled();
+    await waitFor(() => expect(tools.has("prepare_team_inquiry")).toBe(true));
+    await act(async () => { await tools.get("prepare_team_inquiry")!.execute({ resident_ref: "Evelyn", caregiver_id: "caregiver-luis", prompt: "Please confirm your status for Evelyn's scheduled morning visit.", idempotency_key: "test-evelyn-inquiry" }); });
+    expect(screen.getByRole("button", { name: "Approve simulated check-in" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Approve simulated check-in" }));
+    expect(await screen.findByText(/Luis reports that he arrived/i)).toBeInTheDocument();
+    expect(advance).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Record disposition and close/i }));
+    await waitFor(() => expect(advance).toBeEnabled());
   });
 
-  it("makes the advanced multi-resident journey discoverable and directly linkable", async () => {
-    render(<App />);
-    expect(await screen.findByRole("button", { name: /Explore Care Team Day/i })).toBeInTheDocument();
-    expect(screen.getByText("Ready to test continuity across a full care team day?")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Scenario guide"));
-    expect(screen.getByText("One primary journey. Six focused proofs.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Explore Care Team Day/i }));
-    expect(await screen.findByRole("heading", { name: "Run the day without dropping the context." })).toBeInTheDocument();
-    expect(window.location.search).toBe("?scenario=care_team_day");
-    expect(screen.getByRole("button", { name: /Advance simulated time/i })).toBeInTheDocument();
-    const roster = within(screen.getByRole("region", { name: "Care team on duty" }));
-    for (const name of ["Maya Thompson", "Jordan Lee", "Luis Rivera", "Elena Brooks"]) expect(roster.getByText(name)).toBeInTheDocument();
-  });
-
-  it("opens Care Team Day from its shareable scenario URL", async () => {
-    window.history.replaceState({}, "", "/?scenario=care_team_day");
-    render(<App />);
-    expect(await screen.findByRole("heading", { name: "Run the day without dropping the context." })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Demo scenario" })).toHaveValue("care_team_day");
-  });
-
-  it("lets the agent prepare a bounded question that only Rose can answer", async () => {
+  it("advances only after investigation and then exposes Walter's state-specific tool", async () => {
     const tools = installModelContext();
     render(<App />);
-    await screen.findByText("Keep Rose’s care moving—without losing context.");
-    selectScenario("missed_window");
-    await waitFor(() => expect(tools.has("prepare_resident_check_in")).toBe(true));
-    const evidence = await tools.get("get_care_evidence")!.execute({ resident_id: "rose-demo" }) as { evidence_snapshot_id: string };
-    await act(async () => { await tools.get("prepare_resident_check_in")!.execute({ resident_id: "rose-demo", prompt: "Your care circle wants to check in. Are you okay?", evidence_snapshot_id: evidence.evidence_snapshot_id, idempotency_key: "resident-check-001" }); });
-    fireEvent.click(screen.getByRole("button", { name: "Rose’s station" }));
-    expect(await screen.findByRole("heading", { name: "Your care circle wants to check in. Are you okay?" })).toBeInTheDocument();
-    expect(tools.has("prepare_resident_check_in")).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "I'm okay" }));
-    expect(await screen.findByText("Thank you, Rose.")).toBeInTheDocument();
-    selectScenario("on_schedule");
-    await waitFor(() => expect(tools.has("prepare_caregiver_check_in")).toBe(true));
-  });
-
-  it("stages agent outreach and stops at human review", async () => {
-    const tools = installModelContext();
-    render(<App />);
-    await screen.findByText("Keep Rose’s care moving—without losing context.");
-    selectScenario("on_schedule");
-    await waitFor(() => expect(tools.has("prepare_caregiver_check_in")).toBe(true));
-    const evidence = await tools.get("get_care_evidence")!.execute({ resident_id: "rose-demo" }) as { evidence_snapshot_id: string };
-    await act(async () => { await tools.get("prepare_caregiver_check_in")!.execute({ resident_id: "rose-demo", channel: "call", reason: "The current evidence needs caregiver review.", evidence_snapshot_id: evidence.evidence_snapshot_id, idempotency_key: "test-action-001" }); });
-    expect(await screen.findByRole("dialog", { name: "Review caregiver check-in" })).toBeInTheDocument();
-    expect(screen.getByText("Nothing has been sent or transmitted")).toBeInTheDocument();
-  });
-
-  it("turns a compressed 72-hour episode into baseline-aware WebMCP context and a human-gated nurse review", async () => {
-    const tools = installModelContext();
-    render(<App />);
-    await screen.findByText("Keep Rose’s care moving—without losing context.");
-    selectScenario("care_story");
-    expect(await screen.findByRole("heading", { name: "How Rose has been doing, relative to Rose" })).toBeInTheDocument();
-    expect(screen.getByText(/Two care-plan signals now require human review/i)).toBeInTheDocument();
-    await waitFor(() => expect(tools.has("get_resident_context") && tools.has("get_care_story") && tools.has("prepare_care_team_review")).toBe(true));
-    const story = await tools.get("get_care_story")!.execute({ resident_id: "rose-demo", horizon: "72_hours" }) as { story: { unconfirmed_windows: number } };
-    expect(story.story.unconfirmed_windows).toBe(2);
-    const day = await tools.get("get_care_story")!.execute({ resident_id: "rose-demo", horizon: "24_hours" }) as { story: { horizon_hours: number; summary: string } };
-    expect(day.story.horizon_hours).toBe(24);
-    expect(day.story.summary).toContain("24-hour slice");
-    const evidence = await tools.get("get_care_evidence")!.execute({ resident_id: "rose-demo" }) as { evidence_snapshot_id: string };
-    await act(async () => { await tools.get("prepare_care_team_review")!.execute({ resident_id: "rose-demo", review_type: "nurse_review", period_hours: 72, reason: "Two monitoring-plan signals require qualified human review without a clinical conclusion.", evidence_snapshot_id: evidence.evidence_snapshot_id, idempotency_key: "story-review-001" }); });
-    expect(await screen.findByRole("dialog", { name: "Review nurse review" })).toBeInTheDocument();
-    expect(screen.getByText(/Nothing has been sent or transmitted/i)).toBeInTheDocument();
-  });
-
-  it("coordinates a multi-resident day through WebMCP while keeping orientation acknowledgement human-only", async () => {
-    const tools = installModelContext();
-    render(<App />);
-    await screen.findByText("Keep Rose’s care moving—without losing context.");
-    selectScenario("care_team_day");
-    expect(await screen.findByRole("heading", { name: "Run the day without dropping the context." })).toBeInTheDocument();
-    await waitFor(() => expect([...tools.keys()].sort()).toEqual(["get_care_team_overview", "get_resident_context", "get_shift_context"]));
-    const overview = await tools.get("get_care_team_overview")!.execute({}) as { residents: Array<{ display_name: string }>; attention_queue: Array<{ unknown: string[] }> };
-    expect(overview.residents.map((resident) => resident.display_name)).toEqual(["Rose", "Walter", "Evelyn"]);
-    expect(overview.attention_queue[0].unknown).toContain("Whether Luis is physically absent");
-    const evelynShift = await tools.get("get_shift_context")!.execute({ resident_ref: "Evelyn" }) as { shift: { id: string }; resolved_from: string };
-    expect(evelynShift).toMatchObject({ shift: { id: "shift-evelyn-am" }, resolved_from: "resident_reference" });
-
-    fireEvent.click(screen.getByRole("button", { name: /Advance simulated time/i }));
-    await waitFor(() => expect(screen.getByText("Luis's simulated visit check-in arrived")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: /Advance simulated time/i }));
+    await screen.findAllByText("9:15 AM");
+    fireEvent.click(screen.getByRole("button", { name: /Prepare check-in to Luis/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Approve simulated check-in" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Record disposition and close/i }));
+    const advance = await screen.findByRole("button", { name: /Advance to 11:30 AM/i });
+    await waitFor(() => expect(advance).toBeEnabled());
+    fireEvent.click(advance);
+    expect(await screen.findByText("Assignment readiness")).toBeInTheDocument();
     await waitFor(() => expect(tools.has("prepare_assignment_orientation")).toBe(true));
-    await act(async () => { await tools.get("prepare_assignment_orientation")!.execute({ resident_ref: "Walter", caregiver_id: "caregiver-elena", reason: "Prepare Walter-specific orientation before the scheduled afternoon assignment.", idempotency_key: "webmcp-walter-orientation" }); });
-    expect(await screen.findByRole("heading", { name: "Walter orientation · Care Plan v2" })).toBeInTheDocument();
-    await waitFor(() => expect(tools.has("prepare_assignment_orientation")).toBe(false));
-    fireEvent.click(screen.getByRole("button", { name: /I’m Elena/i }));
-    expect(await screen.findByText("Acknowledged by Elena")).toBeInTheDocument();
-    await waitFor(() => expect(tools.has("prepare_assignment_orientation")).toBe(false));
   });
 
-  it("makes device capability boundaries visible", async () => {
+  it("keeps the technical safety contract available without competing with the care workflow", async () => {
     render(<App />);
-    await screen.findByText("Keep Rose’s care moving—without losing context.");
+    await screen.findAllByText("9:15 AM");
     fireEvent.click(screen.getByRole("button", { name: "How WebMCP works" }));
     expect(screen.getByRole("heading", { name: "A safe control plane for connected care" })).toBeInTheDocument();
     expect(screen.getByText("compartment.release.local_only")).toBeInTheDocument();

@@ -76,7 +76,8 @@ server state machine and the visible interface.
 - A resident evidence-resolution loop where only Rose can respond.
 - Snapshot-bound tool ordering that forces re-observation after state changes.
 - Dynamic WebMCP capabilities that appear and disappear with workflow state.
-- A deterministic seven-step **Care Team Day** across Rose, Walter, and Evelyn.
+- A deterministic six-block **Care Team Day** across Rose, Walter, and Evelyn,
+  with one focused decision and a server-enforced advance gate per block.
 - An operational attention queue with explicit deadlines, sources, policy
   bases, knowns, unknowns, and human owners—never opaque medical prioritization.
 - Human-gated resident-specific onboarding: the agent prepares Walter’s packet;
@@ -120,32 +121,20 @@ browser. In Browser settings → Permissions, ensure **Enable site tools** is on
 Site Tools also require a supported account and selected model. Keep the page
 open and use the address-bar Site Tools menu to inspect the registered tools.
 
-The default call-out initially exposes six tools: four persistent safe reads
-(`get_resident_context`, `get_care_story`, `get_care_evidence`,
-`get_shift_context`) plus `get_coverage_candidates` and
-`prepare_shift_coverage`. The interface's **Agent tools** chip shows the same
-set. Nineteen tools exist across the full app; the smaller visible set is an
-intentional workflow boundary.
+The default Care Team Day initially exposes four tools: three safe context reads
+(`get_care_team_overview`, `get_resident_context`, `get_shift_context`) plus
+`prepare_team_inquiry`. The interface's **Agent tools** chip shows the same set.
+After explicit inquiry closure, the clock can advance and the capability set
+changes to Walter's readiness work, then Rose's coverage, visit, and handoff
+tools. The smaller visible set is an intentional workflow boundary.
 
 Suggested prompt:
 
-> Rose's 5 PM caregiver called out. Determine who is eligible to cover the
-> shift, explain every candidate against the explicit constraints, and prepare
-> the eligible option for scheduler review. Do not assign anyone or use an
-> opaque score.
+> I am taking over the care coordinator desk. Tell me what needs attention now,
+> investigate what is unknown, and prepare the next safe step for my review.
 
-The first call should be `get_shift_context({})`; no internal shift ID is
-required. Approve Jordan in the visible scheduler drawer, then inspect Site
-Tools again to confirm coverage actions were replaced by assignment-bound
-briefing tools while safe context reads remained available.
-
-Advanced prompt:
-
-> I’m taking over the care coordinator desk. Catch me up and help me get
-> everyone through today.
-
-Select **Care Team Day**. The initial three-tool surface returns the
-cross-resident operational queue. Advance the deterministic timeline to observe
-Evelyn’s missing record resolve, Walter’s orientation tool appear and disappear
-around Elena’s human acknowledgement, and Rose’s existing coverage workflow
-activate at 2:15 PM.
+The first call should be `get_care_team_overview({})`; no internal resident or
+shift ID is required. Close Evelyn's inquiry before advancing to Walter, then
+continue to Rose's call-out. Inspect Site Tools after each transition to confirm
+that inquiry, readiness, coverage, briefing, and handoff capabilities follow the
+work instead of appearing as one oversized static API.
