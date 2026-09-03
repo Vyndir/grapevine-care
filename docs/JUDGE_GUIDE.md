@@ -56,7 +56,8 @@ expected set.
 
 ## Advanced multi-resident verification
 
-Reset to **Care Team Day** and ask:
+Open **Explore Care Team Day** from the primary demo—or use the shareable
+`?scenario=care_team_day` URL—and ask:
 
 > I’m taking over the care coordinator desk. Catch me up and help me get
 > everyone through today.
@@ -65,6 +66,10 @@ The initial page exposes `get_care_team_overview`, `get_resident_context`, and
 `get_shift_context`. The overview must distinguish operational deadlines from
 medical severity and return a source, policy basis, known facts, unknowns, and a
 human owner for each queue item.
+
+Use **Advance simulated time** to move through the seven deterministic
+milestones. The global **Scenario guide** maps every scenario to a suggested
+prompt and the capability boundary it demonstrates.
 
 1. Ask “Has Luis shown up for Evelyn?” The answer must say no verification
    record has arrived—not that Luis is absent or Evelyn is unsafe.
@@ -110,7 +115,7 @@ Run the complete verification suite with `pnpm run verify`.
 | Criterion | Evidence in this build |
 | --- | --- |
 | WebMCP leverage | Cross-system caregiver work spans a deterministic care-team overview, resident drill-down, coverage, readiness, briefing, and handoff; schemas, freshness, and human gates are part of the interaction rather than prompt prose |
-| Execution | Complete D1-backed state machines, deterministic reset and time progression, responsive UI, version conflicts, idempotency, and 30 passing tests |
+| Execution | Complete D1-backed state machines, deterministic reset and time progression, responsive UI, version conflicts, idempotency, and 32 passing tests |
 | Potential impact | Addresses a concrete continuity failure: safe coverage recovery and context transfer when care changes hands |
 | Creativity and ambition | Combines agents, caregiver operations, resident context, visit evidence, human approvals, and extensible device adapters without turning AI into a clinical or workforce authority |
 

@@ -124,7 +124,7 @@ function installFetch() {
   return fetchMock;
 }
 
-beforeEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); installFetch(); });
+beforeEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); window.history.replaceState({}, "", "/"); installFetch(); });
 
 function selectScenario(scenario: "on_schedule" | "missed_window" | "care_story" | "care_team_day") {
   fireEvent.change(screen.getByLabelText("Demo scenario"), { target: { value: scenario } });
@@ -162,6 +162,27 @@ describe("Grapevine Care", () => {
     selectScenario("missed_window");
     expect(await screen.findByRole("heading", { name: "Rose’s care routine needs attention" })).toBeInTheDocument();
     expect(screen.getByText(/without assuming ingestion/i)).toBeInTheDocument();
+  });
+
+  it("makes the advanced multi-resident journey discoverable and directly linkable", async () => {
+    render(<App />);
+    expect(await screen.findByRole("button", { name: /Explore Care Team Day/i })).toBeInTheDocument();
+    expect(screen.getByText("Ready to test continuity across a full care team day?")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Scenario guide"));
+    expect(screen.getByText("One primary journey. Six focused proofs.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Explore Care Team Day/i }));
+    expect(await screen.findByRole("heading", { name: "Run the day without dropping the context." })).toBeInTheDocument();
+    expect(window.location.search).toBe("?scenario=care_team_day");
+    expect(screen.getByRole("button", { name: /Advance simulated time/i })).toBeInTheDocument();
+    const roster = within(screen.getByRole("region", { name: "Care team on duty" }));
+    for (const name of ["Maya Thompson", "Jordan Lee", "Luis Rivera", "Elena Brooks"]) expect(roster.getByText(name)).toBeInTheDocument();
+  });
+
+  it("opens Care Team Day from its shareable scenario URL", async () => {
+    window.history.replaceState({}, "", "/?scenario=care_team_day");
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "Run the day without dropping the context." })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Demo scenario" })).toHaveValue("care_team_day");
   });
 
   it("lets the agent prepare a bounded question that only Rose can answer", async () => {
@@ -225,9 +246,9 @@ describe("Grapevine Care", () => {
     const evelynShift = await tools.get("get_shift_context")!.execute({ resident_ref: "Evelyn" }) as { shift: { id: string }; resolved_from: string };
     expect(evelynShift).toMatchObject({ shift: { id: "shift-evelyn-am" }, resolved_from: "resident_reference" });
 
-    fireEvent.click(screen.getByRole("button", { name: /Next event/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Advance simulated time/i }));
     await waitFor(() => expect(screen.getByText("Luis's simulated visit check-in arrived")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: /Next event/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Advance simulated time/i }));
     await waitFor(() => expect(tools.has("prepare_assignment_orientation")).toBe(true));
     await act(async () => { await tools.get("prepare_assignment_orientation")!.execute({ resident_ref: "Walter", caregiver_id: "caregiver-elena", reason: "Prepare Walter-specific orientation before the scheduled afternoon assignment.", idempotency_key: "webmcp-walter-orientation" }); });
     expect(await screen.findByRole("heading", { name: "Walter orientation · Care Plan v2" })).toBeInTheDocument();

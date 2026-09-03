@@ -119,10 +119,12 @@ Site Tools menu to inspect the capabilities currently offered by the page.
    approves, then acknowledge it as Luis.
 6. Open **How WebMCP works** to show the state-dependent tool surface.
 
-For the advanced proof, reset to **Care Team Day** and ask: “I’m taking over the
-care coordinator desk. Catch me up and help me get everyone through today.” Use
-**Next event** to move from Evelyn’s uncertainty to Walter’s human-gated
-readiness work and then Rose’s call-out.
+For the advanced proof, open the visible **Explore Care Team Day** invitation or
+use `?scenario=care_team_day`, then ask: “I’m taking over the care coordinator
+desk. Catch me up and help me get everyone through today.” Use **Advance
+simulated time** to move from Evelyn’s uncertainty to Walter’s human-gated
+readiness work and then Rose’s call-out. The global **Scenario guide** maps each
+deterministic scenario to a natural-language judge prompt and its intended proof.
 
 Close with: **“Care doesn't happen in one shift. Grapevine makes sure context
 doesn't end when the shift does.”**

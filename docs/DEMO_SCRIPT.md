@@ -104,7 +104,7 @@ the shift does.”
 
 ## Optional advanced judge walkthrough
 
-After the primary video path, judges can reset to **Care Team Day** and ask:
+After the primary video path, judges can open **Explore Care Team Day** and ask:
 “I’m taking over the care coordinator desk. Catch me up and help me get everyone
 through today.” The compressed timeline demonstrates three distinct needs:
 Evelyn’s missing EVV record resolves from later evidence, Walter’s onboarding

@@ -8,7 +8,7 @@ Command:
 pnpm run test
 ```
 
-Result: **3 test files passed, 30 tests passed, 0 failed.**
+Result: **3 test files passed, 32 tests passed, 0 failed.**
 
 ## Recorded coverage
 

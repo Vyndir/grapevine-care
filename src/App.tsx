@@ -15,7 +15,7 @@ import {
   WarningCircleIcon,
   WaveformIcon
 } from "@phosphor-icons/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CareActions } from "./useCare";
 import { useCare } from "./useCare";
 import { useWebMCPTools, type WebMCPToolsState } from "./useWebMCPTools";
@@ -34,6 +34,22 @@ const scenarios: Array<{ id: Scenario; label: string }> = [
   { id: "door_fault", label: "Door fault" },
   { id: "device_offline", label: "Device offline" }
 ];
+
+const scenarioPlaybook: Array<{ id: Scenario; label: string; proof: string; prompt: string; featured?: boolean }> = [
+  { id: "coverage_callout", label: "Caregiver call-out", proof: "Complete continuity loop", prompt: "Rose’s caregiver called out. Help me recover coverage safely.", featured: true },
+  { id: "care_team_day", label: "Care Team Day", proof: "Three residents across one compressed day", prompt: "I’m taking over the care team. What needs attention and why?", featured: true },
+  { id: "care_story", label: "72-hour story", proof: "Baseline-aware longitudinal context", prompt: "How has Rose been doing relative to her usual routine?" },
+  { id: "missed_window", label: "Missed window", proof: "Uncertainty and resident-supplied evidence", prompt: "What do we actually know about Rose’s missed window?" },
+  { id: "device_offline", label: "Device offline", proof: "Device-aware reasoning without false certainty", prompt: "The station stopped reporting. What is known and unknown?" },
+  { id: "door_fault", label: "Door fault", proof: "Deterministic safety boundaries", prompt: "Why is the dispenser paused, and who has authority?" },
+  { id: "on_schedule", label: "On schedule", proof: "Useful assistance without inventing an incident", prompt: "Catch me up before Rose’s care begins today." }
+];
+
+function scenarioFromUrl(): Scenario | null {
+  if (typeof window === "undefined") return null;
+  const requested = new URLSearchParams(window.location.search).get("scenario");
+  return scenarios.some((scenario) => scenario.id === requested) ? requested as Scenario : null;
+}
 
 function timeLabel(value: string, timeZone: string) {
   const date = new Date(value);
@@ -118,9 +134,9 @@ function CarePlanPanel({ state }: { state: CareState }) {
   return <div className="plan-stack"><section className="profile-card"><div><p className="eyebrow">About Rose · care-team supplied</p><h2>Rose, {state.profile.age}</h2><p>{state.profile.living_arrangement}. {state.profile.support_schedule}.</p></div><span><ShieldCheckIcon weight="fill" /> {state.care_plan.version} signed by {state.care_plan.authorized_by}</span><div className="profile-columns"><article><strong>Relevant history</strong><ul>{state.profile.relevant_history.map((item) => <li key={item}>{item}</li>)}</ul></article><article><strong>Documented baseline</strong><ul>{state.profile.baseline.map((item) => <li key={item}>{item}</li>)}</ul></article><article><strong>Care preferences</strong><ul>{state.profile.preferences.map((item) => <li key={item}>{item}</li>)}</ul></article></div></section><section className="monitoring-panel"><div className="section-heading"><div><p className="eyebrow">What we’re watching</p><h2>Authorized monitoring instructions</h2></div><span>The agent does not invent criteria</span></div><div className="monitoring-grid">{state.monitoring_plan.map((rule) => <article key={rule.id}><span>{rule.category.replaceAll("_", " ")}</span><h3>{rule.title}</h3><p>{rule.instruction}</p><footer><strong>Review threshold</strong>{rule.threshold_description}</footer></article>)}</div></section></div>;
 }
 
-function CaregiverView({ state, actions, busy, onMessage, webmcp }: { state: CareState; actions: CareActions; busy: boolean; onMessage(message: string): void; webmcp: WebMCPToolsState; }) {
+function CaregiverView({ state, actions, busy, onMessage, webmcp, onExploreTeamDay }: { state: CareState; actions: CareActions; busy: boolean; onMessage(message: string): void; webmcp: WebMCPToolsState; onExploreTeamDay(): void; }) {
   if (state.resident.scenario === "care_team_day") return <CareTeamDayView state={state} actions={actions} busy={busy} onMessage={onMessage} webmcp={webmcp} />;
-  if (state.resident.scenario === "coverage_callout") return <CoverageCaregiverView state={state} actions={actions} busy={busy} onMessage={onMessage} story={<StoryPanel state={state} />} plan={<CarePlanPanel state={state} />} webmcp={webmcp} />;
+  if (state.resident.scenario === "coverage_callout") return <CoverageCaregiverView state={state} actions={actions} busy={busy} onMessage={onMessage} story={<StoryPanel state={state} />} plan={<CarePlanPanel state={state} />} webmcp={webmcp} onExploreTeamDay={onExploreTeamDay} />;
   const openAction = state.actions.find((action) => action.status === "awaiting_human_approval");
   const openHandoff = state.handoffs.find((handoff) => handoff.status === "awaiting_human_approval");
   const residentCheckIn = state.resident_check_ins[0];
@@ -168,7 +184,9 @@ const toolDetails: Record<string, [string, string]> = {
   prepare_shift_coverage: ["Eligible recommendation staged for scheduler approval", "approval gated"],
   get_changes_since_last_shift: ["Assignment-relevant changes since the caregiver last visited", "read only"],
   get_shift_brief: ["Person, plan, changes, unresolved items, and boundaries", "read only"],
-  prepare_shift_handoff: ["Completed visit evidence staged for outgoing-caregiver approval", "approval gated"]
+  prepare_shift_handoff: ["Completed visit evidence staged for outgoing-caregiver approval", "approval gated"],
+  get_care_team_overview: ["Three residents, operational deadlines, known facts, unknowns, and human owners", "read only"],
+  prepare_assignment_orientation: ["Resident-specific orientation staged for caregiver acknowledgement", "caregiver gated"]
 };
 
 function SystemView({ state, webmcp }: { state: CareState; webmcp: WebMCPToolsState; }) {
@@ -191,16 +209,31 @@ export default function App() {
   const [workspace, setWorkspace] = useState<Workspace>("caregiver");
   const webmcp = useWebMCPTools(care.actions, care.state, workspace);
   const [message, setMessage] = useState("");
+  const requestedScenario = useRef<Scenario | null>(scenarioFromUrl());
+  const deepLinkApplied = useRef(false);
   const pending = care.state?.actions.find((action) => action.status === "awaiting_human_approval");
   const pendingHandoff = care.state?.handoffs.find((handoff) => handoff.status === "awaiting_human_approval");
   const pageTitle = useMemo(() => ({ resident: "Rose’s station", caregiver: "Caregiver workspace", system: "How WebMCP works" })[workspace], [workspace]);
   useEffect(() => { document.title = `${pageTitle} · Grapevine Care`; }, [pageTitle]);
+  useEffect(() => {
+    if (!care.state || deepLinkApplied.current) return;
+    deepLinkApplied.current = true;
+    if (requestedScenario.current && requestedScenario.current !== care.state.resident.scenario) void care.actions.setScenario(requestedScenario.current);
+  }, [care.actions, care.state]);
+
+  function openScenario(next: Scenario) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("scenario", next);
+    window.history.replaceState({}, "", url);
+    setWorkspace("caregiver");
+    void care.actions.setScenario(next);
+  }
 
   if (!care.state) return <main className="loading-page"><span className="brand-mark"><LeafIcon weight="fill" /></span><h1>Preparing Rose’s care workspace</h1><p>{care.error ?? "Loading the fictional demo state…"}</p>{care.error && <button type="button" onClick={() => void care.actions.refresh()}>Try again</button>}</main>;
   const state = care.state;
   return <div className="care-shell"><header className="care-header"><Brand /><nav className="workspace-nav" aria-label="Choose workspace"><button className={workspace === "caregiver" ? "active" : ""} type="button" onClick={() => setWorkspace("caregiver")}><UsersThreeIcon />Caregiver workspace</button><button className={workspace === "resident" ? "active" : ""} type="button" onClick={() => setWorkspace("resident")}><HouseIcon />Rose’s station</button><button className={workspace === "system" ? "active" : ""} type="button" onClick={() => setWorkspace("system")}><GaugeIcon />How WebMCP works</button></nav>{(pending || pendingHandoff) && <button className="quiet-button" type="button" onClick={() => setWorkspace("caregiver")}><BellIcon />1 review waiting</button>}</header>
-    <section className="demo-bar" aria-label="Demo scenario controls"><div><span><WaveformIcon />Judge demo</span><p>Fictional data · isolated browser run · full deterministic reset</p></div><div className="scenario-picker"><label htmlFor="demo-scenario"><span>Demo scenario</span><select id="demo-scenario" value={state.resident.scenario} disabled={care.busy} onChange={(event) => void care.actions.setScenario(event.target.value as Scenario)}>{scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.label}</option>)}</select></label><button className="reset-button" type="button" disabled={care.busy} onClick={() => void care.actions.setScenario(state.resident.scenario)} aria-label="Reset current demo"><ArrowClockwiseIcon /></button></div></section>
-    {workspace === "resident" && <ResidentView state={state} actions={care.actions} busy={care.busy} onMessage={setMessage} />}{workspace === "caregiver" && <CaregiverView state={state} actions={care.actions} busy={care.busy} onMessage={setMessage} webmcp={webmcp} />}{workspace === "system" && <SystemView state={state} webmcp={webmcp} />}
+    <section className="demo-bar" aria-label="Demo scenario controls"><div><span><WaveformIcon />Judge demo</span><p>Fictional data · isolated browser run · full deterministic reset</p></div><div className="scenario-picker"><details className="judge-playbook"><summary>Scenario guide</summary><div><header><span>Judge playbook</span><strong>One primary journey. Six focused proofs.</strong><p>Choose a scenario, then ask its natural-language prompt. The page exposes only the WebMCP tools valid for that state.</p></header><ul>{scenarioPlaybook.map((item) => <li key={item.id}><div><strong>{item.label}{item.featured ? <em>{item.id === "coverage_callout" ? "Primary" : "Advanced"}</em> : null}</strong><span>{item.proof}</span><code>“{item.prompt}”</code></div><button type="button" disabled={care.busy || state.resident.scenario === item.id} onClick={() => openScenario(item.id)}>{state.resident.scenario === item.id ? "Active" : "Open"}</button></li>)}</ul></div></details><label htmlFor="demo-scenario"><span>Demo scenario</span><select id="demo-scenario" value={state.resident.scenario} disabled={care.busy} onChange={(event) => openScenario(event.target.value as Scenario)}>{scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.label}</option>)}</select></label><button className="reset-button" type="button" disabled={care.busy} onClick={() => void care.actions.setScenario(state.resident.scenario)} aria-label="Reset current demo"><ArrowClockwiseIcon /></button></div></section>
+    {workspace === "resident" && <ResidentView state={state} actions={care.actions} busy={care.busy} onMessage={setMessage} />}{workspace === "caregiver" && <CaregiverView state={state} actions={care.actions} busy={care.busy} onMessage={setMessage} webmcp={webmcp} onExploreTeamDay={() => openScenario("care_team_day")} />}{workspace === "system" && <SystemView state={state} webmcp={webmcp} />}
     <footer className="care-footer"><Brand /><p>Safety-first WebMCP prototype · fictional demonstration · independent MIT-licensed healthcare adaptation</p><a href="https://github.com/Vyndir/grapevine-care" target="_blank" rel="noreferrer">Public source</a></footer>
     {(pending || pendingHandoff) && <ReviewDrawer action={pending} handoff={pendingHandoff} actions={care.actions} busy={care.busy} onMessage={setMessage} />}
     <div className="sr-live" aria-live="polite" aria-atomic="true">{message || care.error}</div>

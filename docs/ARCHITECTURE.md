@@ -39,7 +39,7 @@ or ambiguous references.
 17:00 replacement visit → 19:35 completion → 20:00 handoff
 ```
 
-The “Next event” control changes persisted simulated time and evidence. It never
+The “Advance simulated time” control changes persisted simulated time and evidence. It never
 contacts a real person or silently completes a human task.
 
 ## Longitudinal care layer

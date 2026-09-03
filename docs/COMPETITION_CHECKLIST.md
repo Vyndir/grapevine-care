@@ -32,7 +32,7 @@ Verified against the official challenge and Devpost rules on August 31, 2026.
 - [x] “Since you were last here” assignment brief with unchanged facts and explicit unknowns
 - [x] Simulated EVV events that do not treat missing check-in as proof of absence
 - [x] Multi-resident Care Team Day with exactly three distinct operational needs
-- [x] Deterministic seven-step compressed workday with visible Next event control
+- [x] Deterministic seven-step compressed workday with visible Advance simulated time control
 - [x] Cross-resident WebMCP overview with knowns, unknowns, sources, policy bases, deadlines, and human owners
 - [x] Natural resident references that resolve exactly or fail without guessing
 - [x] Idempotent Walter orientation preparation with human-only Elena acknowledgement
