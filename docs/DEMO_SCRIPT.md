@@ -101,3 +101,13 @@ the shift does.”
 - Use no protected health information, private data, third-party music, or
   unauthorized logos.
 - Upload publicly to YouTube and add the link to Devpost.
+
+## Optional advanced judge walkthrough
+
+After the primary video path, judges can reset to **Care Team Day** and ask:
+“I’m taking over the care coordinator desk. Catch me up and help me get everyone
+through today.” The compressed timeline demonstrates three distinct needs:
+Evelyn’s missing EVV record resolves from later evidence, Walter’s onboarding
+packet remains incomplete until Elena acknowledges it, and Rose’s 2:15 PM
+call-out activates the existing continuity loop. This is the deeper live-test
+path; do not crowd all seven steps into the required sub-three-minute video.

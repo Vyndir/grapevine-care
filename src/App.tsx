@@ -20,12 +20,14 @@ import type { CareActions } from "./useCare";
 import { useCare } from "./useCare";
 import { useWebMCPTools, type WebMCPToolsState } from "./useWebMCPTools";
 import { CoverageCaregiverView } from "./CoverageCaregiverView";
+import { CareTeamDayView } from "./CareTeamDayView";
 import type { CareState, CareTeamHandoff, Dose, PreparedAction, ResidentResponseCode, Scenario } from "./schemas";
 
 type Workspace = "resident" | "caregiver" | "system";
 
 const scenarios: Array<{ id: Scenario; label: string }> = [
   { id: "coverage_callout", label: "Caregiver call-out" },
+  { id: "care_team_day", label: "Care Team Day" },
   { id: "on_schedule", label: "On schedule" },
   { id: "missed_window", label: "Missed window" },
   { id: "care_story", label: "72-hour story" },
@@ -117,6 +119,7 @@ function CarePlanPanel({ state }: { state: CareState }) {
 }
 
 function CaregiverView({ state, actions, busy, onMessage, webmcp }: { state: CareState; actions: CareActions; busy: boolean; onMessage(message: string): void; webmcp: WebMCPToolsState; }) {
+  if (state.resident.scenario === "care_team_day") return <CareTeamDayView state={state} actions={actions} busy={busy} onMessage={onMessage} webmcp={webmcp} />;
   if (state.resident.scenario === "coverage_callout") return <CoverageCaregiverView state={state} actions={actions} busy={busy} onMessage={onMessage} story={<StoryPanel state={state} />} plan={<CarePlanPanel state={state} />} webmcp={webmcp} />;
   const openAction = state.actions.find((action) => action.status === "awaiting_human_approval");
   const openHandoff = state.handoffs.find((handoff) => handoff.status === "awaiting_human_approval");

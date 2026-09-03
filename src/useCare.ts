@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CareEvent, CareState, CareTeamHandoff, CoverageCandidate, CoverageProposal, PreparedAction, ResidentCheckIn, ResidentResponseCode, Scenario, ShiftHandoff } from "./schemas";
+import type { CareEvent, CareState, CareTeamDay, CareTeamHandoff, CoverageCandidate, CoverageProposal, OrientationPacket, PreparedAction, ResidentCheckIn, ResidentResponseCode, Scenario, ShiftHandoff } from "./schemas";
 
 const demoRunStorageKey = "grapevine-care-demo-run";
 
@@ -34,7 +34,11 @@ export type CareActions = {
   prepareCareTeamReview(input: { resident_id: string; review_type: CareTeamHandoff["review_type"]; period_hours: 24 | 72; reason: string; evidence_snapshot_id: string; idempotency_key: string; }): Promise<{ handoff: CareTeamHandoff; approval_required: true; external_side_effect: false; }>;
   resolveAction(actionId: string, resolution: "approved_in_demo" | "dismissed"): Promise<CareState>;
   resolveCareTeamReview(handoffId: string, resolution: "approved_in_demo" | "dismissed"): Promise<CareState>;
-  getShiftContext(input?: { shift_id?: string; }): Promise<Record<string, unknown>>;
+  getShiftContext(input?: { shift_id?: string; resident_ref?: string; }): Promise<Record<string, unknown>>;
+  getCareTeamOverview(): Promise<{ fictional: true; simulated_time: string; step: number; step_label: string; residents: CareTeamDay["residents"]; attention_queue: CareTeamDay["attention_queue"]; next_event_label: string | null; ordering_basis: string; interpretation_boundary: string; }>;
+  advanceCareTeamDay(): Promise<CareState>;
+  prepareAssignmentOrientation(input: { resident_ref: string; caregiver_id: string; reason: string; idempotency_key: string; }): Promise<{ packet: OrientationPacket; acknowledgement_required: boolean; external_side_effect: false; }>;
+  acknowledgeAssignmentOrientation(packetId: string): Promise<CareState>;
   getCoverageCandidates(input: { shift_id: string; }): Promise<{ fictional: true; shift_id: string; candidates: CoverageCandidate[]; method: string; }>;
   prepareShiftCoverage(input: { shift_id: string; caregiver_id: string; schedule_snapshot_id: string; reason: string; idempotency_key: string; }): Promise<{ proposal: CoverageProposal; approval_required: true; external_side_effect: false; duplicate_prevented: boolean; }>;
   resolveShiftCoverage(proposalId: string, resolution: "approved_in_demo" | "dismissed"): Promise<CareState>;
@@ -141,8 +145,33 @@ export function useCare() {
     } finally { setBusy(false); }
   }, [commit]);
 
-  const getShiftContext = useCallback((input: { shift_id?: string; } = {}) =>
+  const getShiftContext = useCallback((input: { shift_id?: string; resident_ref?: string; } = {}) =>
     api<Record<string, unknown>>("/api/care/shift-context", demoRunRef.current.id, { method: "POST", body: JSON.stringify(input) }), []);
+
+  const getCareTeamOverview = useCallback(() =>
+    api<Awaited<ReturnType<CareActions["getCareTeamOverview"]>>>("/api/care/team-overview", demoRunRef.current.id, { method: "POST", body: "{}" }), []);
+
+  const advanceCareTeamDay = useCallback(async () => {
+    setBusy(true);
+    try {
+      const result = await api<{ state: CareState }>("/api/care/team-day/advance", demoRunRef.current.id, { method: "POST", body: "{}" });
+      return commit(result.state);
+    } finally { setBusy(false); }
+  }, [commit]);
+
+  const prepareAssignmentOrientation = useCallback(async (input: { resident_ref: string; caregiver_id: string; reason: string; idempotency_key: string; }) => {
+    const result = await api<Awaited<ReturnType<CareActions["prepareAssignmentOrientation"]>>>("/api/care/orientation-packets", demoRunRef.current.id, { method: "POST", body: JSON.stringify(input) });
+    await refresh();
+    return result;
+  }, [refresh]);
+
+  const acknowledgeAssignmentOrientation = useCallback(async (packetId: string) => {
+    setBusy(true);
+    try {
+      const result = await api<{ state: CareState }>(`/api/care/orientation-packets/${encodeURIComponent(packetId)}/acknowledge`, demoRunRef.current.id, { method: "POST", body: "{}" });
+      return commit(result.state);
+    } finally { setBusy(false); }
+  }, [commit]);
 
   const getCoverageCandidates = useCallback((input: { shift_id: string; }) =>
     api<Awaited<ReturnType<CareActions["getCoverageCandidates"]>>>("/api/care/coverage-candidates", demoRunRef.current.id, { method: "POST", body: JSON.stringify(input) }), []);
@@ -205,6 +234,6 @@ export function useCare() {
     } finally { setBusy(false); }
   }, [commit]);
 
-  const actions = useMemo<CareActions>(() => ({ getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview, getShiftContext, getCoverageCandidates, prepareShiftCoverage, resolveShiftCoverage, getChangesSinceLastShift, getShiftBrief, startShift, completeShift, prepareShiftHandoff, resolveShiftHandoff, acknowledgeShiftHandoff }), [getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview, getShiftContext, getCoverageCandidates, prepareShiftCoverage, resolveShiftCoverage, getChangesSinceLastShift, getShiftBrief, startShift, completeShift, prepareShiftHandoff, resolveShiftHandoff, acknowledgeShiftHandoff]);
+  const actions = useMemo<CareActions>(() => ({ getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview, getShiftContext, getCareTeamOverview, advanceCareTeamDay, prepareAssignmentOrientation, acknowledgeAssignmentOrientation, getCoverageCandidates, prepareShiftCoverage, resolveShiftCoverage, getChangesSinceLastShift, getShiftBrief, startShift, completeShift, prepareShiftHandoff, resolveShiftHandoff, acknowledgeShiftHandoff }), [getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview, getShiftContext, getCareTeamOverview, advanceCareTeamDay, prepareAssignmentOrientation, acknowledgeAssignmentOrientation, getCoverageCandidates, prepareShiftCoverage, resolveShiftCoverage, getChangesSinceLastShift, getShiftBrief, startShift, completeShift, prepareShiftHandoff, resolveShiftHandoff, acknowledgeShiftHandoff]);
   return { state, error, setError, busy, actions };
 }

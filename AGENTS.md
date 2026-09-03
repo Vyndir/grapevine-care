@@ -1,9 +1,11 @@
 # Agent Instructions
 
-## Chrome setup for WebMCP
+## Judge setup for WebMCP
 
-WebMCP should work out of the box. If it does not:
+Use the latest ChatGPT desktop app and its built-in browser with **Enable site
+tools** turned on under Browser settings → Permissions. Keep the page open while
+testing and use a model/account configuration that supports Site Tools.
 
-1. Open `chrome://inspect/#remote-debugging` and enable remote debugging.
-2. Open `chrome://flags/#enable-webmcp-testing`, set **WebMCP testing** to **Enabled**, and relaunch Chrome when prompted.
-3. Reload the application and try the WebMCP tools again.
+Do not describe generic browser clicking as WebMCP execution. Confirm the
+address-bar Site Tools menu exposes the expected page-scoped tools and exercise
+the registered tool contract directly.

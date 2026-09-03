@@ -3,7 +3,8 @@ import * as z from "zod/mini";
 z.config(z.locales.en());
 
 export const residentIdSchema = z.string().check(z.trim(), z.minLength(1), z.maxLength(64));
-export const scenarioSchema = z.enum(["on_schedule", "missed_window", "care_story", "coverage_callout", "door_fault", "device_offline"]);
+export const residentRefSchema = z.string().check(z.trim(), z.minLength(2), z.maxLength(64), z.describe("Resident name or identifier returned by a prior tool, such as Rose, Walter, Evelyn, or rose-demo."));
+export const scenarioSchema = z.enum(["on_schedule", "missed_window", "care_story", "coverage_callout", "care_team_day", "door_fault", "device_offline"]);
 export const shiftIdSchema = z.string().check(z.trim(), z.minLength(3), z.maxLength(64));
 export const caregiverIdSchema = z.string().check(z.trim(), z.minLength(3), z.maxLength(64));
 
@@ -45,7 +46,8 @@ export const requestDeviceHealthSnapshotArgsSchema = z.object({
   idempotency_key: z.string().check(z.trim(), z.minLength(8), z.maxLength(80), z.describe("Unique key preventing duplicate diagnostic records."))
 });
 export const getResidentContextArgsSchema = z.object({
-  resident_id: residentIdSchema
+  resident_id: z.optional(residentIdSchema),
+  resident_ref: z.optional(residentRefSchema)
 });
 export const getCareStoryArgsSchema = z.object({
   resident_id: residentIdSchema,
@@ -60,7 +62,15 @@ export const prepareCareTeamReviewArgsSchema = z.object({
   idempotency_key: z.string().check(z.trim(), z.minLength(8), z.maxLength(80), z.describe("Unique key preventing duplicate handoffs."))
 });
 export const getShiftContextArgsSchema = z.object({
-  shift_id: z.optional(shiftIdSchema.check(z.describe("Optional shift identifier returned by a prior tool. Omit it to resolve the single active disrupted shift in the current caregiver workflow.")))
+  shift_id: z.optional(shiftIdSchema.check(z.describe("Optional shift identifier returned by a prior tool."))),
+  resident_ref: z.optional(residentRefSchema.check(z.describe("Optional resident name or ID. Use this when more than one shift is relevant; never guess when the resident is ambiguous.")))
+});
+export const getCareTeamOverviewArgsSchema = z.object({});
+export const prepareAssignmentOrientationArgsSchema = z.object({
+  resident_ref: residentRefSchema,
+  caregiver_id: caregiverIdSchema,
+  reason: z.string().check(z.trim(), z.minLength(12), z.maxLength(320), z.describe("Operational reason for preparing the resident-specific orientation packet. Do not claim the caregiver completed it.")),
+  idempotency_key: z.string().check(z.trim(), z.minLength(8), z.maxLength(80))
 });
 export const getCoverageCandidatesArgsSchema = z.object({ shift_id: shiftIdSchema });
 export const prepareShiftCoverageArgsSchema = z.object({
@@ -93,6 +103,8 @@ export const toolInputSchemas = {
   getCareStory: z.toJSONSchema(getCareStoryArgsSchema, { target: "draft-07", io: "input" }),
   prepareCareTeamReview: z.toJSONSchema(prepareCareTeamReviewArgsSchema, { target: "draft-07", io: "input" }),
   getShiftContext: z.toJSONSchema(getShiftContextArgsSchema, { target: "draft-07", io: "input" }),
+  getCareTeamOverview: z.toJSONSchema(getCareTeamOverviewArgsSchema, { target: "draft-07", io: "input" }),
+  prepareAssignmentOrientation: z.toJSONSchema(prepareAssignmentOrientationArgsSchema, { target: "draft-07", io: "input" }),
   getCoverageCandidates: z.toJSONSchema(getCoverageCandidatesArgsSchema, { target: "draft-07", io: "input" }),
   prepareShiftCoverage: z.toJSONSchema(prepareShiftCoverageArgsSchema, { target: "draft-07", io: "input" }),
   getChangesSinceLastShift: z.toJSONSchema(getChangesSinceLastShiftArgsSchema, { target: "draft-07", io: "input" }),
@@ -130,7 +142,11 @@ export type CoverageProposal = { id: string; shift_id: string; caregiver_id: str
 export type VisitEvent = { id: string; shift_id: string; caregiver_id: string; event_type: "shift_checked_in" | "routine_completed" | "meal_delivered" | "caregiver_observation" | "shift_checked_out"; summary: string; detail: string; occurred_at: string; evidence_class: string; };
 export type ShiftHandoff = { id: string; shift_id: string; from_caregiver_id: string; to_caregiver_id: string; schedule_snapshot_id: string; completed: string[]; observed: string[]; unresolved: string[]; status: "awaiting_caregiver_approval" | "available_to_next_caregiver" | "dismissed" | "acknowledged"; idempotency_key: string; created_at: string; resolved_at: string | null; };
 export type HandoffAcknowledgement = { id: string; shift_handoff_id: string; caregiver_id: string; acknowledged_at: string; };
+export type TeamResident = { id: "rose-demo" | "walter-demo" | "evelyn-demo"; display_name: string; age: number; care_plan_version: string; support_setting: string; headline: string; status: "routine" | "attention" | "waiting_on_human" | "resolved"; preferences: string[]; context: string[]; };
+export type AttentionItem = { id: string; resident_id: TeamResident["id"]; resident_name: string; state: "attention_now" | "due_later" | "waiting_on_human" | "resolved"; attention_reason: string; deadline: string; source: string; policy_basis: string; known: string[]; unknown: string[]; human_owner: string; };
+export type OrientationPacket = { id: string; resident_id: TeamResident["id"]; caregiver_id: string; care_plan_version: string; status: "awaiting_caregiver_acknowledgement" | "acknowledged"; reason: string; idempotency_key: string; created_at: string; acknowledged_at: string | null; sections: Array<{ title: string; detail: string; }>; };
+export type CareTeamDay = { step: number; step_label: string; next_event_label: string | null; timeline: Array<{ step: number; time: string; label: string; }>; residents: TeamResident[]; attention_queue: AttentionItem[]; orientation_packets: OrientationPacket[]; };
 export type CarePlanProvenance = { version: string; effective_at: string; authorized_by: string; authorization_role: string; device_applied_version: string | null; alignment: "aligned" | "mismatch"; };
 export type BaselineComparison = { signal: string; baseline: string; observed: string; interpretation: string; evidence_status: "consistent" | "changed" | "unresolved"; };
 export type CareStory = { horizon_hours: 24 | 72; starts_at: string; ends_at: string; routine_confirmations: number; unconfirmed_windows: number; resident_check_ins: number; routine_activity_signals: number; device_interruptions: number; summary: string; unresolved: string[]; baseline_comparisons: BaselineComparison[]; };
-export type CareState = { fictional: true; demo_run_id: string; evidence_version: number; resident: Resident; profile: ResidentProfile; monitoring_plan: MonitoringRule[]; care_story: CareStory; doses: Dose[]; devices: CareDevice[]; inventory: Inventory; events: CareEvent[]; resident_check_ins: ResidentCheckIn[]; actions: PreparedAction[]; handoffs: CareTeamHandoff[]; caregivers: CaregiverProfile[]; shifts: CareShift[]; coverage_proposals: CoverageProposal[]; visit_events: VisitEvent[]; shift_handoffs: ShiftHandoff[]; handoff_acknowledgements: HandoffAcknowledgement[]; care_plan: CarePlanProvenance; safety_contract: { ai_may: string[]; ai_may_not: string[]; emergency_notice: string; }; };
+export type CareState = { fictional: true; demo_run_id: string; evidence_version: number; resident: Resident; profile: ResidentProfile; monitoring_plan: MonitoringRule[]; care_story: CareStory; doses: Dose[]; devices: CareDevice[]; inventory: Inventory; events: CareEvent[]; resident_check_ins: ResidentCheckIn[]; actions: PreparedAction[]; handoffs: CareTeamHandoff[]; caregivers: CaregiverProfile[]; shifts: CareShift[]; coverage_proposals: CoverageProposal[]; visit_events: VisitEvent[]; shift_handoffs: ShiftHandoff[]; handoff_acknowledgements: HandoffAcknowledgement[]; care_team_day?: CareTeamDay; care_plan: CarePlanProvenance; safety_contract: { ai_may: string[]; ai_may_not: string[]; emergency_notice: string; }; };

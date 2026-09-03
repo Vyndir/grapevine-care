@@ -32,7 +32,7 @@ get_care_evidence          get_shift_context
 get_coverage_candidates    prepare_shift_coverage
 ```
 
-Seventeen tools exist across the complete application. Grapevine deliberately
+Nineteen tools exist across the complete application. Grapevine deliberately
 offers only four persistent caregiver-context reads plus the currently valid
 workflow tools. The capability chip on the main caregiver page mirrors this
 expected set.
@@ -54,6 +54,29 @@ expected set.
 8. Prepare and approve the handoff, then acknowledge it as Luis in the visible
    UI. No agent acknowledgement tool exists.
 
+## Advanced multi-resident verification
+
+Reset to **Care Team Day** and ask:
+
+> I’m taking over the care coordinator desk. Catch me up and help me get
+> everyone through today.
+
+The initial page exposes `get_care_team_overview`, `get_resident_context`, and
+`get_shift_context`. The overview must distinguish operational deadlines from
+medical severity and return a source, policy basis, known facts, unknowns, and a
+human owner for each queue item.
+
+1. Ask “Has Luis shown up for Evelyn?” The answer must say no verification
+   record has arrived—not that Luis is absent or Evelyn is unsafe.
+2. Advance once. The simulated EVV record resolves the gap without an agent
+   action.
+3. Advance to Walter’s readiness review. `prepare_assignment_orientation`
+   appears and may prepare Care Plan v2 context for Elena, but it cannot record
+   completion.
+4. Confirm the preparation tool disappears while the packet waits. Acknowledge
+   as Elena in the visible UI; only then does Walter’s readiness resolve.
+5. Advance to 2:15 PM. Rose’s call-out enters the existing coverage workflow.
+
 ## Fast source review
 
 | Question | File |
@@ -62,6 +85,7 @@ expected set.
 | Where are schemas and JSON Schema inputs defined? | `src/schemas.ts` |
 | Where are server invariants enforced? | `src/server.ts` |
 | Where is the caregiver-first UI? | `src/CoverageCaregiverView.tsx` |
+| Where is the multi-resident day? | `src/CareTeamDayView.tsx`, `drizzle/0006_care_team_day.sql` |
 | Where is continuity state stored? | `drizzle/0005_caregiver_continuity_loop.sql` |
 | Which behaviors are executable tests? | `src/server.test.ts`, `src/App.test.tsx`, `src/schemas.test.ts` |
 | What can never happen? | `docs/SAFETY.md` |
@@ -71,7 +95,7 @@ Run the complete verification suite with `pnpm run verify`.
 
 ## Key implementation claims
 
-- Seventeen total WebMCP tools; four safe caregiver-context reads remain
+- Nineteen total WebMCP tools; safe caregiver-context reads remain
   discoverable during the call-out while consequential tools follow state.
 - Six tools are dedicated to caregiver continuity.
 - Eight deterministic candidate checks; zero opaque suitability scores.
@@ -85,8 +109,8 @@ Run the complete verification suite with `pnpm run verify`.
 
 | Criterion | Evidence in this build |
 | --- | --- |
-| WebMCP leverage | Cross-system caregiver work is exposed as six purpose-built, state-dependent tools; schemas, freshness, and human gates are part of the interaction rather than prompt prose |
-| Execution | Complete D1-backed state machine, deterministic reset, responsive UI, version conflicts, idempotency, and 27 passing tests |
+| WebMCP leverage | Cross-system caregiver work spans a deterministic care-team overview, resident drill-down, coverage, readiness, briefing, and handoff; schemas, freshness, and human gates are part of the interaction rather than prompt prose |
+| Execution | Complete D1-backed state machines, deterministic reset and time progression, responsive UI, version conflicts, idempotency, and 30 passing tests |
 | Potential impact | Addresses a concrete continuity failure: safe coverage recovery and context transfer when care changes hands |
 | Creativity and ambition | Combines agents, caregiver operations, resident context, visit evidence, human approvals, and extensible device adapters without turning AI into a clinical or workforce authority |
 

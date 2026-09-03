@@ -76,6 +76,11 @@ server state machine and the visible interface.
 - A resident evidence-resolution loop where only Rose can respond.
 - Snapshot-bound tool ordering that forces re-observation after state changes.
 - Dynamic WebMCP capabilities that appear and disappear with workflow state.
+- A deterministic seven-step **Care Team Day** across Rose, Walter, and Evelyn.
+- An operational attention queue with explicit deadlines, sources, policy
+  bases, knowns, unknowns, and human owners—never opaque medical prioritization.
+- Human-gated resident-specific onboarding: the agent prepares Walter’s packet;
+  Elena alone acknowledges it.
 - Structured chain-of-custody provenance and signed care-plan source identity.
 - Safe, idempotent device diagnostics without remote-control authority.
 - Rose profile, personal baseline, care preferences, and care-team-authored
@@ -119,7 +124,7 @@ The default call-out initially exposes six tools: four persistent safe reads
 (`get_resident_context`, `get_care_story`, `get_care_evidence`,
 `get_shift_context`) plus `get_coverage_candidates` and
 `prepare_shift_coverage`. The interface's **Agent tools** chip shows the same
-set. Seventeen tools exist across the full app; the smaller visible set is an
+set. Nineteen tools exist across the full app; the smaller visible set is an
 intentional workflow boundary.
 
 Suggested prompt:
@@ -133,3 +138,14 @@ The first call should be `get_shift_context({})`; no internal shift ID is
 required. Approve Jordan in the visible scheduler drawer, then inspect Site
 Tools again to confirm coverage actions were replaced by assignment-bound
 briefing tools while safe context reads remained available.
+
+Advanced prompt:
+
+> I’m taking over the care coordinator desk. Catch me up and help me get
+> everyone through today.
+
+Select **Care Team Day**. The initial three-tool surface returns the
+cross-resident operational queue. Advance the deterministic timeline to observe
+Evelyn’s missing record resolve, Walter’s orientation tool appear and disappear
+around Elena’s human acknowledgement, and Rose’s existing coverage workflow
+activate at 2:15 PM.

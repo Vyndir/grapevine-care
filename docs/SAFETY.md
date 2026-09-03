@@ -41,6 +41,9 @@ caregivers.
 | Schedule changes after agent observation | Coverage and handoff preparation require a current shift-version snapshot; stale snapshots fail closed |
 | Replacement starts without resident context | `get_shift_brief` requires an approved assignment; the human start control records explicit brief acknowledgement |
 | Missing check-in is treated as proof of absence | Simulated EVV state is labeled as evidence status only; the product makes no absence or welfare conclusion |
+| Operational queue is mistaken for medical triage | Queue order comes from explicit workflow deadlines and policy; outputs disclaim medical severity and opaque scoring |
+| Agent completes caregiver onboarding | WebMCP only prepares Walter’s packet; Elena’s acknowledgement endpoint is reachable solely from the visible human UI |
+| Ambiguous resident reference selects the wrong person | Natural names/IDs must resolve exactly once; ambiguous or unknown references fail closed |
 | Handoff reaches the wrong person | Recipient must match the next scheduled caregiver; access remains locked until the outgoing caregiver approves |
 | Nurse review and operational handoff conflict | Separate tables, schemas, tools, gates, and UI surfaces eliminate the earlier overlapping “shift handoff” review type |
 | One judge changes another judge's demo | Every mutable row is scoped to an isolated browser run |
@@ -66,6 +69,8 @@ caregivers.
 - Coverage draft pending: coverage preparation tools are removed until the scheduler decides.
 - Visit not completed: operational handoff preparation is rejected.
 - Outgoing approval absent: the next caregiver cannot access or acknowledge the handoff.
+- Walter orientation absent: Elena remains not resident-specific assignment-ready.
+- Ambiguous resident reference: the server asks for Rose, Walter, or Evelyn and does not guess.
 - Repeated dose confirmation or action resolution: no second mutation or event.
 - Scenario reset: all mutable run state returns to the documented seed.
 

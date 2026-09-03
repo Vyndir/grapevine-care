@@ -1,5 +1,6 @@
 import {
   getCareEvidenceArgsSchema,
+  getCareTeamOverviewArgsSchema,
   getCareStoryArgsSchema,
   getChangesSinceLastShiftArgsSchema,
   getCoverageCandidatesArgsSchema,
@@ -7,6 +8,7 @@ import {
   getShiftBriefArgsSchema,
   getShiftContextArgsSchema,
   prepareCareTeamReviewArgsSchema,
+  prepareAssignmentOrientationArgsSchema,
   prepareCaregiverCheckInArgsSchema,
   prepareResidentCheckInArgsSchema,
   prepareShiftCoverageArgsSchema,
@@ -17,6 +19,8 @@ import {
   type CareState,
   type CareStory,
   type CoverageCandidate,
+  type CareTeamDay,
+  type OrientationPacket,
   type ResidentResponseCode,
   type Scenario
 } from "./schemas";
@@ -25,6 +29,7 @@ type DbRun = {
   run_id: string; resident_id: string; display_name: string; timezone: string; simulated_time: string; scenario: Scenario;
   severity: "routine" | "attention" | "urgent"; evidence_version: number; care_plan_version: string;
   care_plan_effective_at: string; care_plan_authorized_by: string; care_plan_authorization_role: string;
+  care_team_step: number;
 };
 type DbDose = { dose_id: string; resident_id: string; label: string; scheduled_time: string; window_label: string; compartment: string; status: "ready" | "upcoming" | "confirmed" | "missed" | "blocked"; confirmed_at: string | null; };
 type DbDevice = { device_id: string; resident_id: string; name: string; device_type: "medication_dispenser" | "fall_sensor" | "blood_pressure_cuff"; status: "online" | "offline" | "attention"; battery_percent: number; firmware: string; capabilities: string; door_state: "closed" | "open" | "not_applicable"; last_seen: string; sensor_health: "nominal" | "attention" | "unavailable"; applied_plan_version: string | null; };
@@ -45,6 +50,7 @@ type DbCoverageProposal = { proposal_id: string; shift_id: string; caregiver_id:
 type DbVisitEvent = { visit_event_id: string; shift_id: string; caregiver_id: string; event_type: "shift_checked_in" | "routine_completed" | "meal_delivered" | "caregiver_observation" | "shift_checked_out"; summary: string; detail: string; occurred_at: string; evidence_class: string; };
 type DbShiftHandoff = { shift_handoff_id: string; shift_id: string; from_caregiver_id: string; to_caregiver_id: string; schedule_snapshot_id: string; completed_json: string; observed_json: string; unresolved_json: string; status: "awaiting_caregiver_approval" | "available_to_next_caregiver" | "dismissed" | "acknowledged"; idempotency_key: string; created_at: string; resolved_at: string | null; };
 type DbHandoffAcknowledgement = { acknowledgement_id: string; shift_handoff_id: string; caregiver_id: string; acknowledged_at: string; };
+type DbOrientationPacket = { packet_id: string; resident_id: "rose-demo" | "walter-demo" | "evelyn-demo"; caregiver_id: string; care_plan_version: string; status: "awaiting_caregiver_acknowledgement" | "acknowledged"; reason: string; idempotency_key: string; created_at: string; acknowledged_at: string | null; };
 
 const residentId = "rose-demo";
 const demoRunHeader = "x-grapevine-demo-run";
@@ -55,6 +61,7 @@ export const scenarioConfigs = {
   missed_window: { time: "2026-08-31T09:36:00-04:00", severity: "attention", dose: "missed", device: "online", door: "closed", sensorHealth: "nominal", lastSeen: "2026-08-31T09:36:00-04:00", summary: "Medication window elapsed", detail: "No removal confirmation was recorded. The compartment remains locked." },
   care_story: { time: "2026-09-02T09:42:00-04:00", severity: "attention", dose: "missed", device: "online", door: "closed", sensorHealth: "nominal", lastSeen: "2026-09-02T09:42:00-04:00", summary: "Second monitoring-plan signal in 72 hours", detail: "A second morning medication window lacks confirmation. Rose's signed plan asks the care circle to review repeated gaps; this is not an emergency determination." },
   coverage_callout: { time: "2026-09-02T14:15:00-04:00", severity: "attention", dose: "missed", device: "online", door: "closed", sensorHealth: "nominal", lastSeen: "2026-09-02T14:15:00-04:00", summary: "Evening visit needs coverage", detail: "Maya called out for Rose's 5:00–8:00 PM visit. The schedule is unchanged until a scheduler approves qualified coverage." },
+  care_team_day: { time: "2026-09-02T09:15:00-04:00", severity: "attention", dose: "upcoming", device: "online", door: "closed", sensorHealth: "nominal", lastSeen: "2026-09-02T09:15:00-04:00", summary: "Care-team day is in motion", detail: "Evelyn's scheduled visit has no verification record yet. Walter has an upcoming readiness deadline. Rose's evening visit is currently covered." },
   door_fault: { time: "2026-08-31T08:14:00-04:00", severity: "urgent", dose: "blocked", device: "attention", door: "open", sensorHealth: "attention", lastSeen: "2026-08-31T08:14:00-04:00", summary: "Release blocked by door sensor", detail: "The outer door is open. All compartments remain mechanically secured." },
   device_offline: { time: "2026-08-31T08:29:00-04:00", severity: "attention", dose: "blocked", device: "offline", door: "closed", sensorHealth: "unavailable", lastSeen: "2026-08-31T08:14:00-04:00", summary: "Care station connection lost", detail: "No new telemetry is available. The physical device retains its local schedule and safety lock." }
 } as const;
@@ -88,6 +95,7 @@ async function resetDemoRun(db: D1Database, runId: string, scenario: Scenario) {
   const now = new Date().toISOString();
   const hasCallout = scenario === "coverage_callout";
   await db.batch([
+    db.prepare("DELETE FROM care_demo_orientation_packets WHERE run_id = ?").bind(runId),
     db.prepare("DELETE FROM care_demo_handoff_acknowledgements WHERE run_id = ?").bind(runId),
     db.prepare("DELETE FROM care_demo_shift_handoffs WHERE run_id = ?").bind(runId),
     db.prepare("DELETE FROM care_demo_visit_events WHERE run_id = ?").bind(runId),
@@ -109,9 +117,9 @@ async function resetDemoRun(db: D1Database, runId: string, scenario: Scenario) {
     db.prepare("DELETE FROM care_demo_devices WHERE run_id = ?").bind(runId),
     db.prepare("DELETE FROM care_demo_doses WHERE run_id = ?").bind(runId),
     db.prepare(`INSERT INTO care_demo_runs
-      (run_id, resident_id, display_name, timezone, simulated_time, scenario, severity, created_at, updated_at, evidence_version, care_plan_version, care_plan_effective_at, care_plan_authorized_by, care_plan_authorization_role)
-      VALUES (?, ?, 'Rose', 'America/New_York', ?, ?, ?, ?, ?, 1, 'v4', '2026-08-31T07:00:00-04:00', 'Nurse Ava', 'Care team RN')
-      ON CONFLICT(run_id) DO UPDATE SET simulated_time = excluded.simulated_time, scenario = excluded.scenario, severity = excluded.severity, updated_at = excluded.updated_at, evidence_version = 1, care_plan_version = excluded.care_plan_version, care_plan_effective_at = excluded.care_plan_effective_at, care_plan_authorized_by = excluded.care_plan_authorized_by, care_plan_authorization_role = excluded.care_plan_authorization_role`)
+      (run_id, resident_id, display_name, timezone, simulated_time, scenario, severity, created_at, updated_at, evidence_version, care_plan_version, care_plan_effective_at, care_plan_authorized_by, care_plan_authorization_role, care_team_step)
+      VALUES (?, ?, 'Rose', 'America/New_York', ?, ?, ?, ?, ?, 1, 'v4', '2026-08-31T07:00:00-04:00', 'Nurse Ava', 'Care team RN', 0)
+      ON CONFLICT(run_id) DO UPDATE SET simulated_time = excluded.simulated_time, scenario = excluded.scenario, severity = excluded.severity, updated_at = excluded.updated_at, evidence_version = 1, care_plan_version = excluded.care_plan_version, care_plan_effective_at = excluded.care_plan_effective_at, care_plan_authorized_by = excluded.care_plan_authorized_by, care_plan_authorization_role = excluded.care_plan_authorization_role, care_team_step = 0`)
       .bind(runId, residentId, next.time, scenario, next.severity, now, now),
     db.prepare(`INSERT INTO care_demo_doses (run_id, dose_id, resident_id, label, scheduled_time, window_label, compartment, status, confirmed_at) VALUES
       (?, 'dose-am', ?, 'Morning dose', '08:00', '7:30–9:00 AM', 'M–AM', ?, NULL),
@@ -174,6 +182,15 @@ async function resetDemoRun(db: D1Database, runId: string, scenario: Scenario) {
       (?, 'seed-inventory-forecast', ?, 'inventory_forecast', 'routine', 'Inventory forecast refreshed', 'Twenty-four units remain; estimated eight days at the current plan cadence.', 'Care Station GC-01 · compartment sensor', '2026-08-30T12:05:00-04:00', 'device', 'device-pillbox', 'observation', '2026-08-30T12:05:00-04:00', '2026-08-30T12:05:00-04:00', 'simulated_compartment_sensor', 'v4')`)
       .bind(runId, residentId, `scenario_${scenario}`, next.severity, next.summary, next.detail, eventSource(scenario), next.time, next.time, next.time, runId, residentId, runId, residentId, runId, residentId)
   ]);
+  if (scenario === "care_team_day") {
+    await db.batch([
+      db.prepare(`INSERT INTO care_demo_shifts
+        (run_id, shift_id, resident_id, starts_at, ends_at, required_role, required_orientation_plan_version, original_caregiver_id, assigned_caregiver_id, next_caregiver_id, coverage_status, visit_status, handoff_status, disruption_reason, version) VALUES
+        (?, 'shift-evelyn-am', 'evelyn-demo', '2026-09-02T09:00:00-04:00', '2026-09-02T12:00:00-04:00', 'home_care_aide', 'v3', 'caregiver-luis', 'caregiver-luis', NULL, 'covered', 'in_progress', 'not_ready', NULL, 1),
+        (?, 'shift-walter-pm', 'walter-demo', '2026-09-02T13:00:00-04:00', '2026-09-02T16:00:00-04:00', 'home_care_aide', 'v2', 'caregiver-elena', 'caregiver-elena', NULL, 'assigned', 'not_started', 'not_ready', NULL, 1)`)
+        .bind(runId, runId)
+    ]);
+  }
   if (scenario === "care_story" || scenario === "coverage_callout") {
     await db.batch([
       db.prepare("DELETE FROM care_demo_events WHERE run_id = ? AND event_id IN ('seed-evening-confirmed', 'seed-inventory-forecast')").bind(runId),
@@ -238,10 +255,102 @@ function buildCareStory(run: DbRun, events: DbEvent[]): CareStory {
   };
 }
 
+const careTeamTimeline = [
+  { step: 0, time: "9:15 AM", label: "Evelyn verification gap" },
+  { step: 1, time: "10:30 AM", label: "Evelyn check-in arrives" },
+  { step: 2, time: "11:30 AM", label: "Walter readiness review" },
+  { step: 3, time: "2:15 PM", label: "Rose caregiver call-out" },
+  { step: 4, time: "5:00 PM", label: "Rose replacement visit" },
+  { step: 5, time: "7:35 PM", label: "Rose visit completion" },
+  { step: 6, time: "8:00 PM", label: "Continuity handoff" }
+] as const;
+
+function publicOrientationPacket(packet: DbOrientationPacket): OrientationPacket {
+  return {
+    id: packet.packet_id,
+    resident_id: packet.resident_id,
+    caregiver_id: packet.caregiver_id,
+    care_plan_version: packet.care_plan_version,
+    status: packet.status,
+    reason: packet.reason,
+    idempotency_key: packet.idempotency_key,
+    created_at: packet.created_at,
+    acknowledged_at: packet.acknowledged_at,
+    sections: [
+      { title: "Meet Walter", detail: "Walter prefers a knock and spoken introduction before anyone enters." },
+      { title: "Daily routine", detail: "Use written reminders, allow time with his walker, and keep lunch before afternoon activities." },
+      { title: "Care Plan v2", detail: "Review the current non-clinical visit expectations and acknowledge the version before assignment readiness is complete." },
+      { title: "Evidence boundary", detail: "Record what was observed. Do not infer diagnosis, cause, or clinical significance." }
+    ]
+  };
+}
+
+function buildCareTeamDay(run: DbRun, shifts: DbShift[], packets: DbOrientationPacket[]): CareTeamDay | undefined {
+  if (run.scenario !== "care_team_day") return undefined;
+  const step = run.care_team_step ?? 0;
+  const orientationPackets = packets.map(publicOrientationPacket);
+  const orientationAcknowledged = orientationPackets.some((packet) => packet.resident_id === "walter-demo" && packet.caregiver_id === "caregiver-elena" && packet.status === "acknowledged");
+  const roseShift = shifts.find((shift) => shift.shift_id === "shift-wed-pm");
+  const roseResolved = Boolean(roseShift?.assigned_caregiver_id && roseShift.assigned_caregiver_id !== "caregiver-maya");
+  const attention: CareTeamDay["attention_queue"] = [];
+  attention.push({
+    id: "attention-evelyn-evv",
+    resident_id: "evelyn-demo",
+    resident_name: "Evelyn",
+    state: step === 0 ? "attention_now" : "resolved",
+    attention_reason: step === 0 ? "Scheduled visit began without a verification record" : "Luis's simulated visit check-in arrived",
+    deadline: step === 0 ? "Review now · visit began at 9:00 AM" : "Resolved at 10:30 AM",
+    source: step === 0 ? "EVV adapter · no record received" : "EVV adapter · simulated caregiver attestation",
+    policy_basis: "Agency visit-verification follow-up policy",
+    known: step === 0 ? ["Luis is assigned", "The visit was scheduled for 9:00 AM", "No verification record is present"] : ["Luis is assigned", "A 10:30 AM check-in record is present"],
+    unknown: step === 0 ? ["Whether Luis is physically absent", "Whether Evelyn needs assistance"] : ["The late record does not establish what occurred before 10:30 AM"],
+    human_owner: "Care coordinator"
+  });
+  if (step >= 2 || !orientationAcknowledged) attention.push({
+    id: "attention-walter-readiness",
+    resident_id: "walter-demo",
+    resident_name: "Walter",
+    state: orientationAcknowledged ? "resolved" : step >= 2 ? "waiting_on_human" : "due_later",
+    attention_reason: orientationAcknowledged ? "Elena acknowledged Walter orientation and Care Plan v2" : "Elena is available but not resident-specific assignment-ready",
+    deadline: orientationAcknowledged ? "Resolved" : "Before the 1:00 PM visit",
+    source: "Training registry + schedule + care-plan acknowledgement",
+    policy_basis: "Resident orientation and current plan acknowledgement required before assignment",
+    known: ["Elena's general qualification is current", "Elena is available", ...(orientationAcknowledged ? ["Walter orientation and Care Plan v2 were acknowledged"] : [])],
+    unknown: orientationAcknowledged ? [] : ["Walter orientation is incomplete", "Care Plan v2 has not been acknowledged"],
+    human_owner: "Elena and scheduling coordinator"
+  });
+  if (step >= 3) attention.push({
+    id: "attention-rose-coverage",
+    resident_id: "rose-demo",
+    resident_name: "Rose",
+    state: roseResolved ? "resolved" : roseShift?.coverage_status === "awaiting_scheduler_approval" ? "waiting_on_human" : "attention_now",
+    attention_reason: roseResolved ? "Replacement coverage approved" : "Maya called out for Rose's evening visit",
+    deadline: "Before the 5:00 PM visit",
+    source: "Schedule + caregiver availability",
+    policy_basis: "Qualified, resident-ready coverage requires scheduler approval",
+    known: ["The visit is scheduled for 5:00–8:00 PM", ...(roseResolved ? ["A replacement caregiver is assigned"] : ["No replacement assignment is approved"])],
+    unknown: roseResolved ? [] : ["Who will provide the visit until the scheduler approves coverage"],
+    human_owner: "Scheduling coordinator"
+  });
+  return {
+    step,
+    step_label: careTeamTimeline[step]?.label ?? careTeamTimeline[0].label,
+    next_event_label: careTeamTimeline[step + 1]?.label ?? null,
+    timeline: careTeamTimeline.map((item) => ({ ...item })),
+    residents: [
+      { id: "rose-demo", display_name: "Rose", age: 79, care_plan_version: "v4", support_setting: "Independent living · in-home care", headline: step >= 3 ? (roseResolved ? "Evening coverage restored" : "Evening coverage needs a decision") : "Evening visit currently covered", status: step >= 3 ? (roseResolved ? "resolved" : "attention") : "routine", preferences: ["Call before visiting", "Use large, direct language"], context: ["Mild memory difficulties", "Uses a documented medication routine"] },
+      { id: "walter-demo", display_name: "Walter", age: 84, care_plan_version: "v2", support_setting: "In-home afternoon support", headline: orientationAcknowledged ? "Elena is resident-ready" : "Orientation and plan acknowledgement needed", status: orientationAcknowledged ? "resolved" : step >= 2 ? "waiting_on_human" : "attention", preferences: ["Knock and announce before entering", "Use written reminders"], context: ["Uses a walker", "Prefers lunch before afternoon activities"] },
+      { id: "evelyn-demo", display_name: "Evelyn", age: 81, care_plan_version: "v3", support_setting: "Assisted living · morning visit", headline: step === 0 ? "Visit verification not received" : "Visit check-in received", status: step === 0 ? "attention" : "resolved", preferences: ["Quiet morning routine", "Daughter receives schedule updates"], context: ["Morning support visit", "Attendance evidence is operational, not clinical"] }
+    ],
+    attention_queue: attention,
+    orientation_packets: orientationPackets
+  };
+}
+
 async function loadCareState(db: D1Database, runId: string): Promise<CareState | null> {
   const run = await db.prepare("SELECT * FROM care_demo_runs WHERE run_id = ?").bind(runId).first<DbRun>();
   if (!run) return null;
-  const [doses, devices, inventory, events, residentCheckIns, actions, profile, monitoringRules, handoffs, caregivers, availability, readiness, shifts, coverageProposals, visitEvents, shiftHandoffs, handoffAcknowledgements] = await Promise.all([
+  const [doses, devices, inventory, events, residentCheckIns, actions, profile, monitoringRules, handoffs, caregivers, availability, readiness, shifts, coverageProposals, visitEvents, shiftHandoffs, handoffAcknowledgements, orientationPackets] = await Promise.all([
     db.prepare("SELECT * FROM care_demo_doses WHERE run_id = ? ORDER BY scheduled_time").bind(runId).all<DbDose>(),
     db.prepare("SELECT * FROM care_demo_devices WHERE run_id = ? ORDER BY name").bind(runId).all<DbDevice>(),
     db.prepare("SELECT * FROM care_demo_inventory WHERE run_id = ?").bind(runId).first<DbInventory>(),
@@ -258,7 +367,8 @@ async function loadCareState(db: D1Database, runId: string): Promise<CareState |
     db.prepare("SELECT * FROM care_demo_coverage_proposals WHERE run_id = ? ORDER BY created_at DESC LIMIT 8").bind(runId).all<DbCoverageProposal>(),
     db.prepare("SELECT * FROM care_demo_visit_events WHERE run_id = ? ORDER BY occurred_at").bind(runId).all<DbVisitEvent>(),
     db.prepare("SELECT * FROM care_demo_shift_handoffs WHERE run_id = ? ORDER BY created_at DESC LIMIT 8").bind(runId).all<DbShiftHandoff>(),
-    db.prepare("SELECT * FROM care_demo_handoff_acknowledgements WHERE run_id = ? ORDER BY acknowledged_at DESC").bind(runId).all<DbHandoffAcknowledgement>()
+    db.prepare("SELECT * FROM care_demo_handoff_acknowledgements WHERE run_id = ? ORDER BY acknowledged_at DESC").bind(runId).all<DbHandoffAcknowledgement>(),
+    db.prepare("SELECT * FROM care_demo_orientation_packets WHERE run_id = ? ORDER BY created_at DESC").bind(runId).all<DbOrientationPacket>()
   ]);
   if (!inventory || !profile) return null;
   const publicDevices = devices.results.map(({ device_id, capabilities, ...device }) => ({ id: device_id, ...device, capabilities: JSON.parse(capabilities) as string[] }));
@@ -287,6 +397,7 @@ async function loadCareState(db: D1Database, runId: string): Promise<CareState |
     visit_events: visitEvents.results.map(({ visit_event_id, ...event }) => ({ id: visit_event_id, ...event })),
     shift_handoffs: shiftHandoffs.results.map(({ shift_handoff_id, completed_json, observed_json, unresolved_json, ...handoff }) => ({ id: shift_handoff_id, ...handoff, completed: JSON.parse(completed_json) as string[], observed: JSON.parse(observed_json) as string[], unresolved: JSON.parse(unresolved_json) as string[] })),
     handoff_acknowledgements: handoffAcknowledgements.results.map(({ acknowledgement_id, ...acknowledgement }) => ({ id: acknowledgement_id, ...acknowledgement })),
+    care_team_day: buildCareTeamDay(run, shifts.results, orientationPackets.results),
     care_plan: { version: run.care_plan_version, effective_at: run.care_plan_effective_at, authorized_by: run.care_plan_authorized_by, authorization_role: run.care_plan_authorization_role, device_applied_version: pillbox?.applied_plan_version ?? null, alignment: pillbox?.applied_plan_version === run.care_plan_version ? "aligned" : "mismatch" },
     safety_contract: {
       ai_may: ["Read structured care, schedule, readiness, and continuity evidence", "Explain deterministic coverage constraints", "Summarize changes since a caregiver’s last shift", "Stage coverage or handoff drafts for explicit human approval"],
@@ -356,10 +467,13 @@ async function createShiftContext(db: D1Database, runId: string, body: Record<st
   const state = await loadCareState(db, runId);
   if (!state) return json({ error: "Care workspace not found." }, 404);
   const disruptedShifts = state.shifts.filter((item) => Boolean(item.disruption_reason));
-  if (!parsed.data.shift_id && disruptedShifts.length !== 1) return json({ error: "The current workflow does not resolve to exactly one disrupted shift. Provide shift_id from a prior tool response.", requires_shift_id: true }, 409);
+  const residentIdFromRef = parsed.data.resident_ref ? resolveTeamResidentRef(state, parsed.data.resident_ref) : null;
+  if (parsed.data.resident_ref && !residentIdFromRef) return json({ error: "Resident reference is ambiguous or unknown. Specify Rose, Walter, or Evelyn." }, 409);
+  const residentShifts = residentIdFromRef ? state.shifts.filter((item) => item.resident_id === residentIdFromRef).sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at)) : [];
+  if (!parsed.data.shift_id && !residentIdFromRef && disruptedShifts.length !== 1) return json({ error: "The current workflow does not resolve to exactly one disrupted shift. Provide resident_ref or shift_id from a prior tool response.", requires_resident_or_shift: true }, 409);
   const shift = parsed.data.shift_id
     ? state.shifts.find((item) => item.id === parsed.data.shift_id)
-    : disruptedShifts[0];
+    : residentShifts[0] ?? disruptedShifts[0];
   if (!state || !shift) return json({ error: "Shift not found." }, 404);
   const snapshotId = `sched_${crypto.randomUUID()}`;
   await db.prepare("INSERT INTO care_demo_schedule_snapshots (run_id, snapshot_id, shift_id, shift_version, created_at) VALUES (?, ?, ?, ?, ?)").bind(runId, snapshotId, shift.id, shift.version, state.resident.simulated_time).run();
@@ -371,13 +485,82 @@ async function createShiftContext(db: D1Database, runId: string, body: Record<st
     original_caregiver: findCaregiver(shift.original_caregiver_id),
     assigned_caregiver: findCaregiver(shift.assigned_caregiver_id),
     next_caregiver: findCaregiver(shift.next_caregiver_id),
-    resolved_from: parsed.data.shift_id ? "explicit_shift_id" : "active_disrupted_shift",
+    resolved_from: parsed.data.shift_id ? "explicit_shift_id" : residentIdFromRef ? "resident_reference" : "active_disrupted_shift",
     schedule_snapshot_id: snapshotId,
     continuity_history: state.shifts.filter((item) => item.id !== shift.id).slice(-3),
     unresolved_items: state.care_story.unresolved,
     uncertainty: shift.coverage_status === "coverage_needed" ? "No approved caregiver is assigned to this visit. Availability alone does not establish eligibility." : null,
     boundary: "The server determines eligibility and schedule conflicts. The agent may explain and stage, but a scheduler must approve assignment changes."
   });
+}
+
+function resolveTeamResidentRef(state: CareState, value: string) {
+  const normalized = value.trim().toLowerCase();
+  const residents = state.care_team_day?.residents ?? [{ id: state.resident.id as "rose-demo", display_name: state.resident.display_name }];
+  const matches = residents.filter((resident) => resident.id.toLowerCase() === normalized || resident.display_name.toLowerCase() === normalized);
+  return matches.length === 1 ? matches[0].id : null;
+}
+
+async function getCareTeamOverview(db: D1Database, runId: string, body: Record<string, unknown>) {
+  if (!getCareTeamOverviewArgsSchema.safeParse(body).success) return json({ error: "Invalid care-team overview request." }, 400);
+  const state = await loadCareState(db, runId);
+  if (!state?.care_team_day) return json({ error: "Care Team Day is not the active scenario." }, 409);
+  return json({
+    fictional: true,
+    simulated_time: state.resident.simulated_time,
+    step: state.care_team_day.step,
+    step_label: state.care_team_day.step_label,
+    residents: state.care_team_day.residents,
+    attention_queue: state.care_team_day.attention_queue,
+    next_event_label: state.care_team_day.next_event_label,
+    ordering_basis: "Deterministic deadlines and agency workflow policy; no medical severity or opaque AI score.",
+    interpretation_boundary: "Missing evidence remains unknown. The agent may explain operational context but cannot diagnose, triage, or infer caregiver absence."
+  });
+}
+
+const careTeamStepTimes = [
+  "2026-09-02T09:15:00-04:00", "2026-09-02T10:30:00-04:00", "2026-09-02T11:30:00-04:00",
+  "2026-09-02T14:15:00-04:00", "2026-09-02T17:00:00-04:00", "2026-09-02T19:35:00-04:00", "2026-09-02T20:00:00-04:00"
+];
+
+async function advanceCareTeamDay(db: D1Database, runId: string) {
+  const run = await db.prepare("SELECT * FROM care_demo_runs WHERE run_id = ?").bind(runId).first<DbRun>();
+  if (!run || run.scenario !== "care_team_day") return json({ error: "Care Team Day is not active." }, 409);
+  if (run.care_team_step >= careTeamStepTimes.length - 1) return json({ state: await loadCareState(db, runId), at_end: true });
+  const nextStep = run.care_team_step + 1;
+  const nextTime = careTeamStepTimes[nextStep];
+  const statements = [db.prepare("UPDATE care_demo_runs SET care_team_step = ?, simulated_time = ?, evidence_version = evidence_version + 1, updated_at = ? WHERE run_id = ? AND care_team_step = ?").bind(nextStep, nextTime, nextTime, runId, run.care_team_step)];
+  if (nextStep === 1) statements.push(db.prepare("INSERT OR IGNORE INTO care_demo_visit_events (run_id, visit_event_id, shift_id, caregiver_id, event_type, summary, detail, occurred_at, evidence_class) VALUES (?, 'team-evelyn-checkin', 'shift-evelyn-am', 'caregiver-luis', 'shift_checked_in', 'Evelyn visit check-in received', 'Luis supplied a simulated visit-verification record. The earlier evidence gap is resolved without inferring where he was before check-in.', ?, 'simulated_evv_attestation')").bind(runId, nextTime));
+  if (nextStep === 3) statements.push(db.prepare("UPDATE care_demo_shifts SET assigned_caregiver_id = NULL, coverage_status = 'coverage_needed', disruption_reason = 'Maya called out sick at 2:15 PM', version = version + 1 WHERE run_id = ? AND shift_id = 'shift-wed-pm'").bind(runId));
+  await db.batch(statements);
+  return json({ state: await loadCareState(db, runId), advanced_to_step: nextStep, external_side_effect: false });
+}
+
+async function prepareAssignmentOrientation(db: D1Database, runId: string, body: Record<string, unknown>) {
+  const parsed = prepareAssignmentOrientationArgsSchema.safeParse(body);
+  if (!parsed.success) return json({ error: "Invalid orientation request." }, 400);
+  const state = await loadCareState(db, runId);
+  if (!state?.care_team_day || state.care_team_day.step < 2) return json({ error: "Walter's readiness review is not active yet." }, 409);
+  const resident = resolveTeamResidentRef(state, parsed.data.resident_ref);
+  if (resident !== "walter-demo" || parsed.data.caregiver_id !== "caregiver-elena") return json({ error: "This simulation only permits Walter's orientation packet for Elena." }, 409);
+  const duplicate = await db.prepare("SELECT * FROM care_demo_orientation_packets WHERE run_id = ? AND idempotency_key = ?").bind(runId, parsed.data.idempotency_key).first<DbOrientationPacket>();
+  if (duplicate) return json({ packet: publicOrientationPacket(duplicate), acknowledgement_required: duplicate.status !== "acknowledged", external_side_effect: false, idempotent_replay: true });
+  const packetId = `orient_${crypto.randomUUID()}`;
+  await db.prepare("INSERT INTO care_demo_orientation_packets (run_id, packet_id, resident_id, caregiver_id, care_plan_version, status, reason, idempotency_key, created_at, acknowledged_at) VALUES (?, ?, 'walter-demo', 'caregiver-elena', 'v2', 'awaiting_caregiver_acknowledgement', ?, ?, ?, NULL)").bind(runId, packetId, parsed.data.reason, parsed.data.idempotency_key, state.resident.simulated_time).run();
+  const packet = await db.prepare("SELECT * FROM care_demo_orientation_packets WHERE run_id = ? AND packet_id = ?").bind(runId, packetId).first<DbOrientationPacket>();
+  return json({ packet: publicOrientationPacket(packet!), acknowledgement_required: true, external_side_effect: false, boundary: "The agent prepared the packet; only Elena can acknowledge completion in the visible interface." });
+}
+
+async function acknowledgeAssignmentOrientation(db: D1Database, runId: string, packetId: string) {
+  const run = await db.prepare("SELECT * FROM care_demo_runs WHERE run_id = ?").bind(runId).first<DbRun>();
+  if (!run || run.scenario !== "care_team_day") return json({ error: "Care Team Day is not active." }, 409);
+  const updated = await db.prepare("UPDATE care_demo_orientation_packets SET status = 'acknowledged', acknowledged_at = ? WHERE run_id = ? AND packet_id = ? AND status = 'awaiting_caregiver_acknowledgement'").bind(run.simulated_time, runId, packetId).run();
+  if ((updated.meta.changes ?? 0) !== 1) {
+    const existing = await db.prepare("SELECT packet_id FROM care_demo_orientation_packets WHERE run_id = ? AND packet_id = ?").bind(runId, packetId).first<{ packet_id: string }>();
+    return existing ? json({ state: await loadCareState(db, runId), already_acknowledged: true, external_side_effect: false }) : json({ error: "Orientation packet not found." }, 404);
+  }
+  await versionBump(db, runId, run.simulated_time).run();
+  return json({ state: await loadCareState(db, runId), acknowledged_by: "caregiver-elena", human_acknowledgement_recorded: true, external_side_effect: false });
 }
 
 async function validateScheduleSnapshot(db: D1Database, runId: string, shiftId: string, snapshotId: string) {
@@ -753,6 +936,11 @@ export async function handleApi(request: Request, env: Env) {
   const actionMatch = path.match(/^\/api\/care\/actions\/([^/]+)\/resolve$/);
   if (request.method === "POST" && actionMatch) return resolveAction(env.DB, runId, decodeURIComponent(actionMatch[1]), await readJson(request));
   if (request.method === "POST" && path === "/api/care/device-health-snapshots") return requestDeviceHealthSnapshot(env.DB, runId, await readJson(request));
+  if (request.method === "POST" && path === "/api/care/team-overview") return getCareTeamOverview(env.DB, runId, await readJson(request));
+  if (request.method === "POST" && path === "/api/care/team-day/advance") return advanceCareTeamDay(env.DB, runId);
+  if (request.method === "POST" && path === "/api/care/orientation-packets") return prepareAssignmentOrientation(env.DB, runId, await readJson(request));
+  const orientationAcknowledgeMatch = path.match(/^\/api\/care\/orientation-packets\/([^/]+)\/acknowledge$/);
+  if (request.method === "POST" && orientationAcknowledgeMatch) return acknowledgeAssignmentOrientation(env.DB, runId, decodeURIComponent(orientationAcknowledgeMatch[1]));
   if (request.method === "POST" && path === "/api/care/shift-context") return createShiftContext(env.DB, runId, await readJson(request));
   if (request.method === "POST" && path === "/api/care/coverage-candidates") return getCoverageCandidates(env.DB, runId, await readJson(request));
   if (request.method === "POST" && path === "/api/care/coverage-proposals") return prepareShiftCoverage(env.DB, runId, await readJson(request));

@@ -57,6 +57,28 @@ The bootstrap call accepts `get_shift_context({})`. Grapevine resolves the one
 active disrupted shift and returns its opaque IDs for later calls, so a person
 can simply ask, “Who can cover Rose tonight?”
 
+### Advanced scenario: Care Team Day
+
+The short **Caregiver call-out** remains the default judge path. **Care Team
+Day** is the broader proof: a seven-step compressed workday across exactly three
+fictional residents.
+
+- **Evelyn, 81:** a scheduled visit has no verification record. Grapevine says
+  presence is unknown—not that the caregiver failed to arrive—and later resolves
+  the gap when a simulated EVV record appears.
+- **Walter, 84:** Elena is generally qualified and available, but Walter-specific
+  orientation and Care Plan v2 acknowledgement are incomplete. WebMCP can
+  prepare the packet; only Elena can acknowledge it in the visible interface.
+- **Rose, 79:** a later call-out enters the existing deterministic coverage,
+  briefing, visit, and handoff workflow.
+
+`get_care_team_overview` returns the operational attention queue with deadlines,
+sources, policy bases, known facts, unknowns, and human owners. It is ordered by
+workflow rules—not medical severity or an opaque AI score. Natural references
+such as `resident_ref: "Evelyn"` let an agent drill into a shift without asking
+the user for internal IDs. Across all scenarios the application has 19 tools,
+but only the small state-appropriate subset is page-scoped at any moment.
+
 ## Human authority and reliability
 
 - The server—not the model—evaluates all eight coverage constraints.
@@ -96,6 +118,11 @@ Site Tools menu to inspect the capabilities currently offered by the page.
 5. Prepare the handoff to Luis. Show that Luis cannot see it until Jordan
    approves, then acknowledge it as Luis.
 6. Open **How WebMCP works** to show the state-dependent tool surface.
+
+For the advanced proof, reset to **Care Team Day** and ask: “I’m taking over the
+care coordinator desk. Catch me up and help me get everyone through today.” Use
+**Next event** to move from Evelyn’s uncertainty to Walter’s human-gated
+readiness work and then Rose’s call-out.
 
 Close with: **“Care doesn't happen in one shift. Grapevine makes sure context
 doesn't end when the shift does.”**

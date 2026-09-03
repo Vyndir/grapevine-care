@@ -17,6 +17,31 @@ Shift handoff release: outgoing caregiver approval only
 Medical and emergency decisions: outside the product
 ```
 
+## Multi-resident care-team layer
+
+Migration `0006_care_team_day.sql` adds a seven-step persisted simulation and
+idempotent orientation packets. It intentionally models exactly three distinct
+operational problems: Evelyn’s absent visit-verification record, Walter’s
+resident-specific onboarding gap, and Rose’s later coverage disruption.
+
+`get_care_team_overview` is the portfolio-level read. The server—not the
+language model—constructs each queue item’s deadline, source, policy basis,
+known facts, unknowns, and human owner. The queue is operational ordering, not
+medical triage. `resident_ref` resolves exact names or IDs and fails on unknown
+or ambiguous references.
+
+```text
+9:15 Evelyn: EVV record missing; presence unknown
+10:30 EVV record arrives; gap resolves without agent intervention
+11:30 Walter: orientation and Care Plan v2 acknowledgement due
+      → agent prepares packet → Elena acknowledges in human UI
+14:15 Rose: Maya calls out → existing coverage workflow activates
+17:00 replacement visit → 19:35 completion → 20:00 handoff
+```
+
+The “Next event” control changes persisted simulated time and evidence. It never
+contacts a real person or silently completes a human task.
+
 ## Longitudinal care layer
 
 The 72-hour episode adds three D1-backed concepts without changing the existing

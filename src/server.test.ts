@@ -38,6 +38,7 @@ class TestD1 {
     this.sqlite.exec(readFileSync(new URL("../drizzle/0003_evidence_resolution_loop.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0004_longitudinal_care_story.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0005_caregiver_continuity_loop.sql", import.meta.url), "utf8"));
+    this.sqlite.exec(readFileSync(new URL("../drizzle/0006_care_team_day.sql", import.meta.url), "utf8"));
   }
   close() { this.sqlite.close(); }
 }
@@ -266,6 +267,44 @@ describe("Grapevine Care server invariants", () => {
     const stale = await call(runA, "/api/care/coverage-proposals", { method: "POST", body: JSON.stringify({ shift_id: "shift-wed-pm", caregiver_id: "caregiver-jordan", schedule_snapshot_id: context.schedule_snapshot_id, reason: "Retry with a stale schedule snapshot after the shift version changed.", idempotency_key: "coverage-stale-001" }) });
     expect(stale.status).toBe(409);
     expect(await stale.json()).toMatchObject({ stale_schedule: true });
+  });
+
+  it("runs a deterministic multi-resident care-team day without turning missing evidence into a conclusion", async () => {
+    expect((await scenario(runA, "care_team_day")).status).toBe(200);
+    let current = await state(runA);
+    expect(current.care_team_day?.residents.map((resident) => resident.display_name)).toEqual(["Rose", "Walter", "Evelyn"]);
+    expect(current.care_team_day?.attention_queue.find((item) => item.resident_id === "evelyn-demo")).toMatchObject({ state: "attention_now", unknown: ["Whether Luis is physically absent", "Whether Evelyn needs assistance"] });
+
+    const overviewResponse = await call(runA, "/api/care/team-overview", { method: "POST", body: "{}" });
+    expect(overviewResponse.status).toBe(200);
+    const overview = await overviewResponse.json() as { ordering_basis: string; attention_queue: Array<{ resident_id: string }> };
+    expect(overview.ordering_basis).toContain("no medical severity");
+    expect(overview.attention_queue.some((item) => item.resident_id === "evelyn-demo")).toBe(true);
+
+    const evelynContext = await (await call(runA, "/api/care/shift-context", { method: "POST", body: JSON.stringify({ resident_ref: "Evelyn" }) })).json() as { shift: { id: string }; resolved_from: string };
+    expect(evelynContext).toMatchObject({ shift: { id: "shift-evelyn-am" }, resolved_from: "resident_reference" });
+
+    expect((await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" })).status).toBe(200);
+    current = await state(runA);
+    expect(current.care_team_day?.step).toBe(1);
+    expect(current.care_team_day?.attention_queue.find((item) => item.resident_id === "evelyn-demo")?.state).toBe("resolved");
+    expect(current.visit_events.some((event) => event.id === "team-evelyn-checkin")).toBe(true);
+
+    await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" });
+    const prepared = await (await call(runA, "/api/care/orientation-packets", { method: "POST", body: JSON.stringify({ resident_ref: "Walter", caregiver_id: "caregiver-elena", reason: "Prepare the current resident-specific orientation before assignment readiness.", idempotency_key: "walter-orientation-001" }) })).json() as { packet: { id: string; status: string }; acknowledgement_required: boolean };
+    expect(prepared.packet.status).toBe("awaiting_caregiver_acknowledgement");
+    expect(prepared.acknowledgement_required).toBe(true);
+    const replay = await (await call(runA, "/api/care/orientation-packets", { method: "POST", body: JSON.stringify({ resident_ref: "Walter", caregiver_id: "caregiver-elena", reason: "Prepare the current resident-specific orientation before assignment readiness.", idempotency_key: "walter-orientation-001" }) })).json() as { packet: { id: string }; idempotent_replay: boolean };
+    expect(replay).toMatchObject({ packet: { id: prepared.packet.id }, idempotent_replay: true });
+    expect((await call(runA, `/api/care/orientation-packets/${prepared.packet.id}/acknowledge`, { method: "POST", body: "{}" })).status).toBe(200);
+    current = await state(runA);
+    expect(current.care_team_day?.residents.find((resident) => resident.id === "walter-demo")?.status).toBe("resolved");
+
+    await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" });
+    current = await state(runA);
+    expect(current.care_team_day?.step).toBe(3);
+    expect(current.shifts.find((shift) => shift.id === "shift-wed-pm")).toMatchObject({ coverage_status: "coverage_needed", assigned_caregiver_id: null });
+    expect(current.care_team_day?.attention_queue.find((item) => item.resident_id === "rose-demo")?.attention_reason).toContain("called out");
   });
 
   it("rejects unsafe channels and oversized bodies", async () => {

@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { getShiftContextArgsSchema, parseArgs, prepareCaregiverCheckInArgsSchema, prepareCareTeamReviewArgsSchema, prepareShiftCoverageArgsSchema, prepareShiftHandoffArgsSchema } from "./schemas";
+import { getShiftContextArgsSchema, parseArgs, prepareAssignmentOrientationArgsSchema, prepareCaregiverCheckInArgsSchema, prepareCareTeamReviewArgsSchema, prepareShiftCoverageArgsSchema, prepareShiftHandoffArgsSchema } from "./schemas";
 
 describe("care tool inputs", () => {
   it("lets natural-language coverage work bootstrap without an opaque shift ID", () => {
     expect(parseArgs(getShiftContextArgsSchema, {})).toEqual({});
     expect(parseArgs(getShiftContextArgsSchema, { shift_id: "shift-wed-pm" }).shift_id).toBe("shift-wed-pm");
+    expect(parseArgs(getShiftContextArgsSchema, { resident_ref: "Evelyn" }).resident_ref).toBe("Evelyn");
+  });
+
+  it("keeps assignment orientation prepared until the named caregiver acknowledges it", () => {
+    expect(parseArgs(prepareAssignmentOrientationArgsSchema, { resident_ref: "Walter", caregiver_id: "caregiver-elena", reason: "Prepare Walter-specific context and the current care-plan acknowledgement.", idempotency_key: "walter-orientation-001" }).resident_ref).toBe("Walter");
+    expect(() => parseArgs(prepareAssignmentOrientationArgsSchema, { resident_ref: "W", caregiver_id: "x", reason: "short", idempotency_key: "tiny" })).toThrow();
   });
 
   it("requires a bounded reason and idempotency key for staged outreach", () => {
