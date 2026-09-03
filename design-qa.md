@@ -19,6 +19,7 @@ The implementation was inspected in the same interaction state and at the top of
 - The gate remains directly below the time region and clearly explains why advancement is disabled.
 - The residents rail remains secondary to the current-decision workspace.
 - The cooler blue-gray canvas, white operational surfaces, deep teal, ink typography, and restrained amber attention treatment are consistent with the selected direction.
+- The logo tile, time beacon, and primary Care Team Day actions now share the single `--grapevine-green` brand token (`#08624a`).
 - The real Grapevine Care brand and existing navigation labels were intentionally preserved instead of adopting concept-only brand copy.
 
 ## Focused comparison evidence
@@ -51,6 +52,7 @@ No actionable P0, P1, or P2 visual differences remain. The narrower browser capt
 
 - Initial local capture was blocked by stale local D1 preview state. The existing state was moved to a recoverable backup, migrations were applied to a fresh local preview database, and the same Care Team Day state was recaptured successfully.
 - The first valid visual comparison found no P0/P1/P2 design mismatches. No post-comparison visual fixes were required.
+- Browser annotation follow-up: the time beacon and primary actions were consolidated onto the exact logo green, then recaptured in the same state. The final comparison artifacts contain this matched palette.
 
 ## Follow-up polish
 

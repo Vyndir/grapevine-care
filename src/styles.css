@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  --grapevine-green: #08624a;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #12283a;
   background: #eef3f5;
@@ -17,7 +18,7 @@ button { cursor: pointer; }
 .care-shell { min-height: 100vh; }
 .care-header { min-height: 76px; padding: 12px clamp(20px, 3vw, 42px); border-bottom: 1px solid #d6e0e4; display: flex; align-items: center; justify-content: space-between; gap: 20px; background: rgba(255,255,255,.96); position: sticky; top: 0; z-index: 20; backdrop-filter: blur(16px); }
 .brand { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
-.brand-mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; color: #fff; background: #08624a; box-shadow: 0 6px 16px rgba(8,98,74,.18); }
+.brand-mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; color: #fff; background: var(--grapevine-green); box-shadow: 0 6px 16px rgba(8,98,74,.18); }
 .brand-mark svg { width: 21px; height: 21px; }
 .brand > span:last-child { display: grid; gap: 2px; }
 .brand strong { font-size: 17px; letter-spacing: -.02em; }
@@ -271,7 +272,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .team-day-hero h1 { max-width: 850px; margin: 7px 0 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(35px, 4.2vw, 56px); line-height: 1.02; letter-spacing: -.05em; }
 .team-day-hero > div:first-child > p:last-child { max-width: 720px; margin: 13px 0 0; color: #61736a; line-height: 1.65; }
 .team-day-controls { display: flex; align-items: center; gap: 10px; }
-.team-day-controls > button, .primary-inline, .orientation-card > button { min-height: 39px; padding: 0 15px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 10px; background: #174b39; color: white; font-size: 10px; font-weight: 850; }
+.team-day-controls > button, .primary-inline, .orientation-card > button { min-height: 39px; padding: 0 15px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 10px; background: var(--grapevine-green); color: white; font-size: 10px; font-weight: 850; }
 .team-day-controls > button svg { width: 14px; height: 14px; }
 .team-day-grid { margin-top: 20px; display: grid; grid-template-columns: 250px minmax(0,1fr); gap: 18px; align-items: start; }
 .team-rail, .attention-workspace, .day-timeline { border: 1px solid #d4dfe4; border-radius: 16px; background: #fff; box-shadow: 0 8px 24px rgba(20,48,65,.055); }
@@ -351,7 +352,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 /* Care Team Day: time-led, one-decision-at-a-time workspace */
 .demo-bar.simplified .inquiry-rule { color: #52665c; font-size: 12px; font-weight: 750; }
 .day-clock-hero { min-height: 292px; padding: 0; overflow: hidden; display: grid; grid-template-columns: minmax(340px, 35%) minmax(0,1fr); grid-template-rows: 1fr; align-items: stretch; gap: 0; border: 1px solid #cbd8de; border-radius: 18px; background: #fff; color: #12283a; box-shadow: 0 12px 32px rgba(17,49,67,.075); }
-.day-clock { grid-column: 1; grid-row: 1; padding: 34px 38px 86px; display: grid; align-content: start; background: #075568; color: #fff; }
+.day-clock { grid-column: 1; grid-row: 1; padding: 34px 38px 86px; display: grid; align-content: start; background: var(--grapevine-green); color: #fff; }
 .day-clock small { color: #bfe2e2; font-size: 12px; font-weight: 800; letter-spacing: .035em; text-transform: uppercase; }
 .day-clock strong { margin-top: 23px; font-family: Inter,ui-sans-serif,system-ui,sans-serif; font-size: clamp(66px,7vw,96px); font-weight: 650; line-height: .9; letter-spacing: -.065em; font-variant-numeric: tabular-nums; text-wrap: nowrap; text-shadow: 0 2px 14px rgba(0,29,43,.2); }
 .day-clock span { margin-top: 17px; color: #e4f4f3; font-size: 18px; font-weight: 650; letter-spacing: -.015em; }
@@ -375,7 +376,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .time-gate > div > span { display: grid; gap: 3px; }
 .time-gate strong { color: #152e3e; font-size: 14px; }
 .time-gate small { color: #637783; font-size: 12px; line-height: 1.4; }
-.time-gate > button, .primary-inline, .secondary-inline, .candidate-list button { min-height: 42px; padding: 0 15px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 10px; background: #174b39; color: #fff; font-size: 12px; font-weight: 850; }
+.time-gate > button, .primary-inline, .secondary-inline, .candidate-list button { min-height: 42px; padding: 0 15px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 10px; background: var(--grapevine-green); color: #fff; font-size: 12px; font-weight: 850; }
 .time-gate > button:disabled { color: #7d8990; background: #e7ecee; cursor: not-allowed; }
 .team-day-grid.focused { grid-template-columns: 270px minmax(0,1fr); }
 .focused-workspace { padding: clamp(22px,3vw,34px); }
@@ -437,7 +438,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .team-day-invitation strong, .team-day-invitation small { display: block; }
 .team-day-invitation strong { margin-top: 3px; font-family: Georgia, "Times New Roman", serif; font-size: 17px; font-weight: 500; }
 .team-day-invitation small { margin-top: 4px; color: #64756c; font-size: 9px; line-height: 1.45; }
-.team-day-invitation > button { min-height: 38px; padding: 0 13px; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 10px; color: #fff; background: #285b49; font-size: 9px; font-weight: 850; }
+.team-day-invitation > button { min-height: 38px; padding: 0 13px; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 10px; color: #fff; background: var(--grapevine-green); font-size: 9px; font-weight: 850; }
 .team-day-invitation > button svg { width: 13px; height: 13px; }
 .continuity-tabs { margin-bottom: 20px; }
 .context-disclosure { margin-top: 16px; border: 1px solid #d8d9d0; border-radius: 18px; background: #fffefa; }
