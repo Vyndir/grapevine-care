@@ -170,7 +170,8 @@ after the final cold-start production verification.
 - Built with: WebMCP, React, TypeScript, Vite, Cloudflare Workers, Cloudflare D1,
   Zod, OpenAI Sites, Codex, Vitest
 - Tested client: ChatGPT desktop in-app browser through Codex, with Site Tools
-  enabled, on the final Sites version 20 production deployment.
+  enabled. The full six-block protocol and a separate final-release smoke check
+  both passed on the public production deployment.
 - Current verification: 31 automated tests plus TypeScript, public-repository
   security audit, production build, full six-block cold-start browser run,
   mid-flow refresh, deterministic reset, second-session isolation, and zero

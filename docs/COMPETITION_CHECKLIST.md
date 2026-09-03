@@ -55,7 +55,7 @@ September 3, 2026.
 - [x] Confirm the joint MIT license is visible at the repository root/about area
 - [ ] Record and publicly upload the demo video to YouTube with audio
 - [ ] Add live URL, repository URL, video URL, screenshots, and team members to Devpost
-- [x] Run the complete cold-start judge protocol on Sites version 20
+- [x] Run the complete cold-start judge protocol and a separate final-release smoke check
 - [x] Set the Sites deployment to judge-accessible public access
 - [ ] Submit before September 3, 2026 at 1:00 p.m. PT
 

@@ -60,7 +60,7 @@ public-repository audit, and production build also passed through `pnpm run veri
 
 ## Final production cold-start verification
 
-Sites version 20 was tested on September 3, 2026 in a fresh ChatGPT desktop
+The public production release was tested on September 3, 2026 in a fresh ChatGPT desktop
 in-app browser session with WebMCP available. The following passed:
 
 - Care Team Day rendered on first load with no reload workaround.
