@@ -40,6 +40,7 @@ class TestD1 {
     this.sqlite.exec(readFileSync(new URL("../drizzle/0005_caregiver_continuity_loop.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0006_care_team_day.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../drizzle/0007_inquiry_driven_day.sql", import.meta.url), "utf8"));
+    this.sqlite.exec(readFileSync(new URL("../drizzle/0008_orientation_follow_up.sql", import.meta.url), "utf8"));
   }
   close() { this.sqlite.close(); }
 }
@@ -306,12 +307,17 @@ describe("Grapevine Care server invariants", () => {
     expect(current.care_team_day?.step).toBe(1);
     expect(current.care_team_day?.attention_queue.find((item) => item.resident_id === "evelyn-demo")?.state).toBe("resolved");
 
-    const prepared = await (await call(runA, "/api/care/orientation-packets", { method: "POST", body: JSON.stringify({ resident_ref: "Walter", caregiver_id: "caregiver-elena", reason: "Prepare the current resident-specific orientation before assignment readiness.", idempotency_key: "walter-orientation-001" }) })).json() as { packet: { id: string; status: string }; acknowledgement_required: boolean };
-    expect(prepared.packet.status).toBe("awaiting_caregiver_acknowledgement");
-    expect(prepared.acknowledgement_required).toBe(true);
+    const prepared = await (await call(runA, "/api/care/orientation-packets", { method: "POST", body: JSON.stringify({ resident_ref: "Walter", caregiver_id: "caregiver-elena", reason: "Prepare the current resident-specific orientation before assignment readiness.", idempotency_key: "walter-orientation-001" }) })).json() as { packet: { id: string; status: string }; coordinator_follow_up_required: boolean };
+    expect(prepared.packet.status).toBe("awaiting_coordinator_outreach");
+    expect(prepared.coordinator_follow_up_required).toBe(true);
     const replay = await (await call(runA, "/api/care/orientation-packets", { method: "POST", body: JSON.stringify({ resident_ref: "Walter", caregiver_id: "caregiver-elena", reason: "Prepare the current resident-specific orientation before assignment readiness.", idempotency_key: "walter-orientation-001" }) })).json() as { packet: { id: string }; idempotent_replay: boolean };
     expect(replay).toMatchObject({ packet: { id: prepared.packet.id }, idempotent_replay: true });
-    expect((await call(runA, `/api/care/orientation-packets/${prepared.packet.id}/acknowledge`, { method: "POST", body: "{}" })).status).toBe(200);
+    expect((await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" })).status).toBe(409);
+    expect((await call(runA, `/api/care/orientation-packets/${prepared.packet.id}/follow-up`, { method: "POST", body: "{}" })).status).toBe(200);
+    current = await state(runA);
+    expect(current.care_team_day?.orientation_packets[0]).toMatchObject({ status: "response_received", response_detail: expect.stringContaining("Can you verify") });
+    expect((await call(runA, "/api/care/team-day/advance", { method: "POST", body: "{}" })).status).toBe(409);
+    expect((await call(runA, `/api/care/orientation-packets/${prepared.packet.id}/verify`, { method: "POST", body: "{}" })).status).toBe(200);
     current = await state(runA);
     expect(current.care_team_day?.residents.find((resident) => resident.id === "walter-demo")?.status).toBe("resolved");
 

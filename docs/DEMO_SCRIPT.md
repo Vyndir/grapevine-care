@@ -34,7 +34,8 @@ Advance to 11:30 AM.
 
 Ask whether Elena is ready for Walter's visit. Show that availability alone is
 insufficient: Walter-specific orientation and Care Plan v2 acknowledgement are
-missing. Let WebMCP prepare the packet; Elena acknowledges it herself.
+missing. Let WebMCP prepare the packet and follow-up. Send the simulated check-in,
+review Elena's submitted acknowledgement, then verify receipt and clear her.
 
 Advance to 2:15 PM.
 

@@ -40,8 +40,9 @@ export type CareActions = {
   resolveTeamInquiry(inquiryId: string, decision: "send_in_demo" | "dismissed"): Promise<CareState>;
   closeTeamInquiry(inquiryId: string): Promise<CareState>;
   advanceCareTeamDay(): Promise<CareState>;
-  prepareAssignmentOrientation(input: { resident_ref: string; caregiver_id: string; reason: string; idempotency_key: string; }): Promise<{ packet: OrientationPacket; acknowledgement_required: boolean; external_side_effect: false; }>;
-  acknowledgeAssignmentOrientation(packetId: string): Promise<CareState>;
+  prepareAssignmentOrientation(input: { resident_ref: string; caregiver_id: string; reason: string; idempotency_key: string; }): Promise<{ packet: OrientationPacket; coordinator_follow_up_required: boolean; external_side_effect: false; }>;
+  sendAssignmentOrientationFollowUp(packetId: string): Promise<CareState>;
+  verifyAssignmentOrientation(packetId: string): Promise<CareState>;
   getCoverageCandidates(input: { shift_id: string; }): Promise<{ fictional: true; shift_id: string; candidates: CoverageCandidate[]; method: string; }>;
   prepareShiftCoverage(input: { shift_id: string; caregiver_id: string; schedule_snapshot_id: string; reason: string; idempotency_key: string; }): Promise<{ proposal: CoverageProposal; approval_required: true; external_side_effect: false; duplicate_prevented: boolean; }>;
   resolveShiftCoverage(proposalId: string, resolution: "approved_in_demo" | "dismissed"): Promise<CareState>;
@@ -190,10 +191,18 @@ export function useCare() {
     return result;
   }, [refresh]);
 
-  const acknowledgeAssignmentOrientation = useCallback(async (packetId: string) => {
+  const sendAssignmentOrientationFollowUp = useCallback(async (packetId: string) => {
     setBusy(true);
     try {
-      const result = await api<{ state: CareState }>(`/api/care/orientation-packets/${encodeURIComponent(packetId)}/acknowledge`, demoRunRef.current.id, { method: "POST", body: "{}" });
+      const result = await api<{ state: CareState }>(`/api/care/orientation-packets/${encodeURIComponent(packetId)}/follow-up`, demoRunRef.current.id, { method: "POST", body: "{}" });
+      return commit(result.state);
+    } finally { setBusy(false); }
+  }, [commit]);
+
+  const verifyAssignmentOrientation = useCallback(async (packetId: string) => {
+    setBusy(true);
+    try {
+      const result = await api<{ state: CareState }>(`/api/care/orientation-packets/${encodeURIComponent(packetId)}/verify`, demoRunRef.current.id, { method: "POST", body: "{}" });
       return commit(result.state);
     } finally { setBusy(false); }
   }, [commit]);
@@ -259,6 +268,6 @@ export function useCare() {
     } finally { setBusy(false); }
   }, [commit]);
 
-  const actions = useMemo<CareActions>(() => ({ getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview, getShiftContext, getCareTeamOverview, prepareTeamInquiry, resolveTeamInquiry, closeTeamInquiry, advanceCareTeamDay, prepareAssignmentOrientation, acknowledgeAssignmentOrientation, getCoverageCandidates, prepareShiftCoverage, resolveShiftCoverage, getChangesSinceLastShift, getShiftBrief, startShift, completeShift, prepareShiftHandoff, resolveShiftHandoff, acknowledgeShiftHandoff }), [getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview, getShiftContext, getCareTeamOverview, prepareTeamInquiry, resolveTeamInquiry, closeTeamInquiry, advanceCareTeamDay, prepareAssignmentOrientation, acknowledgeAssignmentOrientation, getCoverageCandidates, prepareShiftCoverage, resolveShiftCoverage, getChangesSinceLastShift, getShiftBrief, startShift, completeShift, prepareShiftHandoff, resolveShiftHandoff, acknowledgeShiftHandoff]);
+  const actions = useMemo<CareActions>(() => ({ getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview, getShiftContext, getCareTeamOverview, prepareTeamInquiry, resolveTeamInquiry, closeTeamInquiry, advanceCareTeamDay, prepareAssignmentOrientation, sendAssignmentOrientationFollowUp, verifyAssignmentOrientation, getCoverageCandidates, prepareShiftCoverage, resolveShiftCoverage, getChangesSinceLastShift, getShiftBrief, startShift, completeShift, prepareShiftHandoff, resolveShiftHandoff, acknowledgeShiftHandoff }), [getState, refresh, setScenario, confirmDose, getEvidenceSnapshot, prepareResidentCheckIn, respondResidentCheckIn, prepareAction, requestDeviceHealthSnapshot, prepareCareTeamReview, resolveAction, resolveCareTeamReview, getShiftContext, getCareTeamOverview, prepareTeamInquiry, resolveTeamInquiry, closeTeamInquiry, advanceCareTeamDay, prepareAssignmentOrientation, sendAssignmentOrientationFollowUp, verifyAssignmentOrientation, getCoverageCandidates, prepareShiftCoverage, resolveShiftCoverage, getChangesSinceLastShift, getShiftBrief, startShift, completeShift, prepareShiftHandoff, resolveShiftHandoff, acknowledgeShiftHandoff]);
   return { state, error, setError, busy, actions };
 }

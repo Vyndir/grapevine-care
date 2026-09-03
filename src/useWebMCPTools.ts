@@ -217,7 +217,7 @@ export function useWebMCPTools(actions: CareActions, state: CareState | null, wo
     } satisfies WebMCPTool,
     assignmentOrientation: {
       name: "prepare_assignment_orientation", title: "Prepare assignment orientation",
-      description: "Prepare Walter's resident-specific orientation and Care Plan v2 packet for Elena. The agent cannot mark training complete; Elena must acknowledge the visible packet before readiness resolves.",
+      description: "Prepare Walter's resident-specific orientation packet and a readiness follow-up for Elena. The agent cannot send the follow-up, submit Elena's acknowledgement, verify receipt, or clear the visit; those transitions remain visible coordinator and caregiver evidence.",
       inputSchema: toolInputSchemas.prepareAssignmentOrientation, annotations: baseAnnotations,
       async execute(args: unknown) { return actions.prepareAssignmentOrientation(parseArgs(prepareAssignmentOrientationArgsSchema, args)); }
     } satisfies WebMCPTool,

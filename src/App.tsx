@@ -167,7 +167,7 @@ const toolDetails: Record<string, [string, string]> = {
   prepare_shift_handoff: ["Completed visit evidence staged for outgoing-caregiver approval", "approval gated"],
   get_care_team_overview: ["Three residents, operational deadlines, known facts, unknowns, and human owners", "read only"],
   prepare_team_inquiry: ["A bounded caregiver status question staged from current evidence", "coordinator approval gated"],
-  prepare_assignment_orientation: ["Resident-specific orientation staged for caregiver acknowledgement", "caregiver gated"]
+  prepare_assignment_orientation: ["Walter’s packet and Elena readiness follow-up staged", "coordinator verified"]
 };
 
 function SystemView({ state, webmcp }: { state: CareState; webmcp: WebMCPToolsState; }) {

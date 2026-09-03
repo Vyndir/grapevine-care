@@ -80,8 +80,8 @@ server state machine and the visible interface.
   with one focused decision and a server-enforced advance gate per block.
 - An operational attention queue with explicit deadlines, sources, policy
   bases, knowns, unknowns, and human owners—never opaque medical prioritization.
-- Human-gated resident-specific onboarding: the agent prepares Walter’s packet;
-  Elena alone acknowledges it.
+- Human-gated resident-specific onboarding: the agent prepares Walter’s packet
+  and follow-up; the coordinator sends it and verifies Elena’s explicit response.
 - Structured chain-of-custody provenance and signed care-plan source identity.
 - Safe, idempotent device diagnostics without remote-control authority.
 - Rose profile, personal baseline, care preferences, and care-team-authored

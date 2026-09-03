@@ -88,12 +88,16 @@ function installFetch() {
       return Response.json({ state });
     }
     if (url === "/api/care/orientation-packets" && state.care_team_day) {
-      const packet = { id: "orientation-walter-1", resident_id: "walter-demo" as const, caregiver_id: "caregiver-elena", care_plan_version: "v2", status: "awaiting_caregiver_acknowledgement" as const, reason: String(body.reason), idempotency_key: String(body.idempotency_key), created_at: state.resident.simulated_time, acknowledged_at: null, sections: [{ title: "Meet Walter", detail: "Knock and announce before entering." }] };
+      const packet = { id: "orientation-walter-1", resident_id: "walter-demo" as const, caregiver_id: "caregiver-elena", care_plan_version: "v2", status: "awaiting_coordinator_outreach" as const, reason: String(body.reason), idempotency_key: String(body.idempotency_key), created_at: state.resident.simulated_time, response_detail: null, responded_at: null, verified_at: null, sections: [{ title: "Meet Walter", detail: "Knock and announce before entering." }] };
       state = { ...state, care_team_day: { ...state.care_team_day, orientation_packets: [packet] } };
-      return Response.json({ packet, acknowledgement_required: true, external_side_effect: false });
+      return Response.json({ packet, coordinator_follow_up_required: true, external_side_effect: false });
     }
-    if (url.includes("/orientation-packets/") && url.endsWith("/acknowledge") && state.care_team_day) {
-      state = { ...state, care_team_day: { ...state.care_team_day, orientation_packets: state.care_team_day.orientation_packets.map((packet) => ({ ...packet, status: "acknowledged" as const, acknowledged_at: state.resident.simulated_time })), residents: state.care_team_day.residents.map((resident) => resident.id === "walter-demo" ? { ...resident, status: "resolved" as const } : resident) } };
+    if (url.includes("/orientation-packets/") && url.endsWith("/follow-up") && state.care_team_day) {
+      state = { ...state, care_team_day: { ...state.care_team_day, orientation_packets: state.care_team_day.orientation_packets.map((packet) => ({ ...packet, status: "response_received" as const, response_detail: "I have Walter’s packet. I reviewed Care Plan v2 and submitted my acknowledgement. Can you verify that you see it?", responded_at: state.resident.simulated_time })) } };
+      return Response.json({ state });
+    }
+    if (url.includes("/orientation-packets/") && url.endsWith("/verify") && state.care_team_day) {
+      state = { ...state, care_team_day: { ...state.care_team_day, orientation_packets: state.care_team_day.orientation_packets.map((packet) => ({ ...packet, status: "verified" as const, verified_at: state.resident.simulated_time })), residents: state.care_team_day.residents.map((resident) => resident.id === "walter-demo" ? { ...resident, status: "resolved" as const } : resident), advance_gate: { ...state.care_team_day.advance_gate, allowed: true, blockers: [] } } };
       return Response.json({ state });
     }
     if (url === "/api/care/shift-context") {
@@ -179,6 +183,16 @@ describe("Grapevine Care", () => {
     fireEvent.click(advance);
     expect(await screen.findByText("Assignment readiness")).toBeInTheDocument();
     await waitFor(() => expect(tools.has("prepare_assignment_orientation")).toBe(true));
+    fireEvent.click(screen.getByRole("button", { name: /Prepare packet and follow-up/i }));
+    expect(await screen.findByRole("button", { name: /Send readiness check-in to Elena/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /I’m Elena/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Send readiness check-in to Elena/i }));
+    expect(await screen.findByText(/Can you verify that you see it/i)).toBeInTheDocument();
+    const nextAdvance = screen.getByRole("button", { name: /Advance to 2:15 PM/i });
+    expect(nextAdvance).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Verify receipt and clear Elena/i }));
+    expect((await screen.findAllByText(/Elena may proceed with Walter’s visit/i)).length).toBeGreaterThan(0);
+    await waitFor(() => expect(nextAdvance).toBeEnabled());
   });
 
   it("keeps the technical safety contract available without competing with the care workflow", async () => {

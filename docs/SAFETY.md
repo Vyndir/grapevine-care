@@ -42,7 +42,7 @@ caregivers.
 | Replacement starts without resident context | `get_shift_brief` requires an approved assignment; the human start control records explicit brief acknowledgement |
 | Missing check-in is treated as proof of absence | Simulated EVV state is labeled as evidence status only; the product makes no absence or welfare conclusion |
 | Operational queue is mistaken for medical triage | Queue order comes from explicit workflow deadlines and policy; outputs disclaim medical severity and opaque scoring |
-| Agent completes caregiver onboarding | WebMCP only prepares Walter’s packet; Elena’s acknowledgement endpoint is reachable solely from the visible human UI |
+| Agent completes caregiver onboarding | WebMCP only prepares Walter’s packet and follow-up; coordinator outreach, Elena’s labeled response, and coordinator verification are visible non-agent transitions |
 | Ambiguous resident reference selects the wrong person | Natural names/IDs must resolve exactly once; ambiguous or unknown references fail closed |
 | Handoff reaches the wrong person | Recipient must match the next scheduled caregiver; access remains locked until the outgoing caregiver approves |
 | Nurse review and operational handoff conflict | Separate tables, schemas, tools, gates, and UI surfaces eliminate the earlier overlapping “shift handoff” review type |

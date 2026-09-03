@@ -30,8 +30,9 @@ rail make time the spine of the experience:
    WebMCP prepares a bounded status inquiry; a coordinator approves it; Luis
    supplies a simulated self-report; the coordinator records a disposition.
 2. **11:30 AM · Walter:** Elena is available, but resident-specific orientation
-   and Care Plan v2 acknowledgement are incomplete. The agent prepares the packet;
-   Elena—not the agent—acknowledges it.
+   and Care Plan v2 acknowledgement are incomplete. The agent prepares the packet
+   and follow-up; the coordinator sends it, reviews Elena's response, and verifies
+   receipt before clearing her to proceed.
 3. **2:15 PM · Rose:** Maya calls out before the evening visit. Deterministic
    constraints identify Jordan as the eligible replacement; a scheduler approves.
 4. **5:00 PM · Replacement visit:** Jordan reviews context and starts the visit.
@@ -110,9 +111,10 @@ See the [timed demo script](docs/DEMO_SCRIPT.md), [judge guide](docs/JUDGE_GUIDE
 - Zod schemas converted to WebMCP JSON Schema inputs
 - Vitest, Testing Library, and Node SQLite test harness
 
-Seven migrations separate base care state, browser-run isolation, evidence
+Eight migrations separate base care state, browser-run isolation, evidence
 resolution, longitudinal context, caregiver continuity, the multi-resident day,
-and inquiry-driven time gating. See [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+inquiry-driven time gating, and Walter's readiness follow-up verification. See
+[ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Local setup and verification
 

@@ -36,7 +36,8 @@ or ambiguous references.
       → agent prepares inquiry → coordinator sends → Luis responds
       → coordinator records disposition
 11:30 Walter: orientation and Care Plan v2 acknowledgement due
-      → agent prepares packet → Elena acknowledges in human UI
+      → agent prepares packet + follow-up → coordinator sends
+      → Elena response arrives → coordinator verifies and clears
 14:15 Rose: Maya calls out → existing coverage workflow activates
 17:00 replacement visit → 19:35 completion → 20:00 handoff
 ```

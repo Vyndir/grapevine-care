@@ -53,7 +53,7 @@ Result: **3 test files passed, 32 tests passed, 0 failed.**
 | Evelyn’s missing EVV record preserves caregiver presence as unknown | Pass | Server and WebMCP contract tests |
 | Natural resident reference resolves Evelyn’s shift without an internal ID | Pass | Server and WebMCP contract tests |
 | Evelyn’s gap resolves when later deterministic evidence arrives | Pass | Server multi-resident test |
-| Walter orientation preparation is idempotent and acknowledgement is human-only | Pass | Server and frontend WebMCP tests |
+| Walter orientation preparation is idempotent; outreach, response, and verification are explicit | Pass | Server and frontend WebMCP tests |
 | Rose’s coverage tools appear when the compressed day reaches her call-out | Pass | Server state-transition test |
 
 ## Deterministic outcomes observed
@@ -75,7 +75,7 @@ Result: **3 test files passed, 32 tests passed, 0 failed.**
 - Assignment changes before scheduler approval: **0**
 - Handoffs exposed before outgoing-caregiver approval: **0**
 - Agent-facing next-caregiver acknowledgement capabilities: **0**
-- Agent-facing orientation acknowledgement capabilities: **0**
+- Agent-facing orientation submission or coordinator-verification capabilities: **0**
 - Missing EVV records converted into caregiver-absence claims: **0**
 
 ## Scope and honesty note

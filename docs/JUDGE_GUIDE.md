@@ -51,8 +51,11 @@ Ask:
 1. Advance time. Walter becomes the single focused decision.
 2. Ask whether Elena is ready for Walter's visit.
 3. The agent identifies missing resident-specific orientation and Care Plan v2
-   acknowledgement, then prepares the packet.
-4. Elena acknowledges it in the human-only interface. The agent cannot do so.
+   acknowledgement, then prepares the packet and follow-up.
+4. The coordinator sends the simulated check-in. Elena's response explicitly
+   reports that she reviewed and submitted the packet.
+5. The coordinator verifies receipt and clears Elena to proceed. The judge never
+   impersonates Elena, and the agent cannot complete or verify the requirement.
 
 ### 2:15 PM — Rose coverage recovery
 
@@ -74,7 +77,7 @@ the handoff; Luis acknowledges it.
   answer is that presence is unknown.
 - Try to assign an ineligible caregiver: the server rejects it.
 - Reuse a stale schedule or evidence snapshot: preparation fails closed.
-- Try to have the agent acknowledge Walter's packet or Luis's handoff: no such
+- Try to have the agent submit or verify Walter's packet or acknowledge Luis's handoff: no such
   WebMCP capability exists.
 
 ## Fast source review

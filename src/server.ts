@@ -52,7 +52,7 @@ type DbCoverageProposal = { proposal_id: string; shift_id: string; caregiver_id:
 type DbVisitEvent = { visit_event_id: string; shift_id: string; caregiver_id: string; event_type: "shift_checked_in" | "routine_completed" | "meal_delivered" | "caregiver_observation" | "shift_checked_out"; summary: string; detail: string; occurred_at: string; evidence_class: string; };
 type DbShiftHandoff = { shift_handoff_id: string; shift_id: string; from_caregiver_id: string; to_caregiver_id: string; schedule_snapshot_id: string; completed_json: string; observed_json: string; unresolved_json: string; status: "awaiting_caregiver_approval" | "available_to_next_caregiver" | "dismissed" | "acknowledged"; idempotency_key: string; created_at: string; resolved_at: string | null; };
 type DbHandoffAcknowledgement = { acknowledgement_id: string; shift_handoff_id: string; caregiver_id: string; acknowledged_at: string; };
-type DbOrientationPacket = { packet_id: string; resident_id: "rose-demo" | "walter-demo" | "evelyn-demo"; caregiver_id: string; care_plan_version: string; status: "awaiting_caregiver_acknowledgement" | "acknowledged"; reason: string; idempotency_key: string; created_at: string; acknowledged_at: string | null; };
+type DbOrientationPacket = { packet_id: string; resident_id: "rose-demo" | "walter-demo" | "evelyn-demo"; caregiver_id: string; care_plan_version: string; status: "awaiting_coordinator_outreach" | "response_received" | "verified"; reason: string; idempotency_key: string; created_at: string; response_detail: string | null; responded_at: string | null; verified_at: string | null; };
 type DbTeamInquiry = { inquiry_id: string; resident_id: "rose-demo" | "walter-demo" | "evelyn-demo"; caregiver_id: string; inquiry_type: "visit_verification"; prompt: string; status: "awaiting_coordinator_approval" | "response_received" | "resolved" | "dismissed"; response_code: "arrived_verification_failed" | "delayed" | "cannot_attend" | "no_response" | null; response_detail: string | null; idempotency_key: string; created_at: string; responded_at: string | null; resolved_at: string | null; };
 
 const residentId = "rose-demo";
@@ -283,7 +283,9 @@ function publicOrientationPacket(packet: DbOrientationPacket): OrientationPacket
     reason: packet.reason,
     idempotency_key: packet.idempotency_key,
     created_at: packet.created_at,
-    acknowledged_at: packet.acknowledged_at,
+    response_detail: packet.response_detail,
+    responded_at: packet.responded_at,
+    verified_at: packet.verified_at,
     sections: [
       { title: "Meet Walter", detail: "Walter prefers a knock and spoken introduction before anyone enters." },
       { title: "Daily routine", detail: "Use written reminders, allow time with his walker, and keep lunch before afternoon activities." },
@@ -300,7 +302,8 @@ function buildCareTeamDay(run: DbRun, shifts: DbShift[], packets: DbOrientationP
   const inquiries = inquiryRows.map(publicTeamInquiry);
   const evelynInquiry = inquiries.find((inquiry) => inquiry.resident_id === "evelyn-demo" && inquiry.inquiry_type === "visit_verification");
   const evelynResolved = evelynInquiry?.status === "resolved";
-  const orientationAcknowledged = orientationPackets.some((packet) => packet.resident_id === "walter-demo" && packet.caregiver_id === "caregiver-elena" && packet.status === "acknowledged");
+  const walterPacket = orientationPackets.find((packet) => packet.resident_id === "walter-demo" && packet.caregiver_id === "caregiver-elena");
+  const orientationVerified = walterPacket?.status === "verified";
   const roseShift = shifts.find((shift) => shift.shift_id === "shift-wed-pm");
   const roseResolved = Boolean(roseShift?.assigned_caregiver_id && roseShift.assigned_caregiver_id !== "caregiver-maya");
   const attention: CareTeamDay["attention_queue"] = [];
@@ -321,14 +324,14 @@ function buildCareTeamDay(run: DbRun, shifts: DbShift[], packets: DbOrientationP
     id: "attention-walter-readiness",
     resident_id: "walter-demo",
     resident_name: "Walter",
-    state: orientationAcknowledged ? "resolved" : "waiting_on_human",
-    attention_reason: orientationAcknowledged ? "Elena acknowledged Walter orientation and Care Plan v2" : "Elena is available but not resident-specific assignment-ready",
-    deadline: orientationAcknowledged ? "Resolved" : "Before the 1:00 PM visit",
+    state: orientationVerified ? "resolved" : "waiting_on_human",
+    attention_reason: orientationVerified ? "Elena is verified and cleared to proceed with Walter’s visit" : walterPacket?.status === "response_received" ? "Elena submitted her acknowledgement; verify receipt" : walterPacket ? "Walter’s packet is ready; check in with Elena" : "Elena is available, with one readiness requirement incomplete",
+    deadline: orientationVerified ? "Resolved" : "Before the 1:00 PM visit",
     source: "Training registry + schedule + care-plan acknowledgement",
     policy_basis: "Resident orientation and current plan acknowledgement required before assignment",
-    known: ["Elena's general qualification is current", "Elena is available", ...(orientationAcknowledged ? ["Walter orientation and Care Plan v2 were acknowledged"] : [])],
-    unknown: orientationAcknowledged ? [] : ["Walter orientation is incomplete", "Care Plan v2 has not been acknowledged"],
-    human_owner: "Elena and scheduling coordinator"
+    known: ["Elena's general qualification is current", "Elena is available", ...(walterPacket?.status === "response_received" ? ["Elena reported reviewing Walter’s packet and submitting her acknowledgement"] : []), ...(orientationVerified ? ["The coordinator verified receipt against Care Plan v2"] : [])],
+    unknown: orientationVerified ? [] : walterPacket?.status === "response_received" ? ["Coordinator verification is still required before Elena proceeds"] : ["Walter orientation and Care Plan v2 acknowledgement are not yet verified"],
+    human_owner: "Scheduling coordinator"
   });
   if (step >= 2) attention.push({
     id: "attention-rose-coverage",
@@ -363,7 +366,7 @@ function buildCareTeamDay(run: DbRun, shifts: DbShift[], packets: DbOrientationP
     });
   }
   const blockers = step === 0 ? (evelynResolved ? [] : [evelynInquiry?.status === "response_received" ? "Review Luis’s response and close Evelyn’s verification exception." : evelynInquiry ? "Approve the prepared check-in and review Luis’s response." : "Investigate Evelyn’s missing verification record by checking in with Luis."])
-    : step === 1 ? (orientationAcknowledged ? [] : ["Elena must review and acknowledge Walter’s current orientation packet."])
+    : step === 1 ? (orientationVerified ? [] : [walterPacket?.status === "response_received" ? "Verify Elena’s submitted acknowledgement and clear her to proceed." : walterPacket ? "Send the prepared readiness follow-up to Elena and review her response." : "Prepare Walter’s packet and readiness follow-up for Elena."])
     : step === 2 ? (roseResolved ? [] : ["A scheduler must approve qualified replacement coverage for Rose."])
     : step === 3 ? (roseShift?.visit_status === "in_progress" || roseShift?.visit_status === "completed" ? [] : ["Jordan must acknowledge the current brief and start the visit."])
     : step === 4 ? (roseShift?.visit_status === "completed" ? [] : ["Jordan must record the visit outcome before handoff."])
@@ -375,7 +378,7 @@ function buildCareTeamDay(run: DbRun, shifts: DbShift[], packets: DbOrientationP
     timeline: careTeamTimeline.map((item) => ({ ...item })),
     residents: [
       { id: "rose-demo", display_name: "Rose", age: 79, care_plan_version: "v4", support_setting: "Independent living · in-home care", headline: step >= 2 ? (roseResolved ? "Evening coverage restored" : "Evening coverage needs a decision") : "Evening visit currently covered", status: step >= 2 ? (roseResolved ? "resolved" : "attention") : "routine", preferences: ["Call before visiting", "Use large, direct language"], context: ["Mild memory difficulties", "Uses a documented medication routine"] },
-      { id: "walter-demo", display_name: "Walter", age: 84, care_plan_version: "v2", support_setting: "In-home afternoon support", headline: orientationAcknowledged ? "Elena is resident-ready" : "Orientation and plan acknowledgement needed", status: orientationAcknowledged ? "resolved" : step >= 1 ? "waiting_on_human" : "routine", preferences: ["Knock and announce before entering", "Use written reminders"], context: ["Uses a walker", "Prefers lunch before afternoon activities"] },
+      { id: "walter-demo", display_name: "Walter", age: 84, care_plan_version: "v2", support_setting: "In-home afternoon support", headline: orientationVerified ? "Elena is verified to proceed" : "Elena is available; readiness follow-up needed", status: orientationVerified ? "resolved" : step >= 1 ? "waiting_on_human" : "routine", preferences: ["Knock and announce before entering", "Use written reminders"], context: ["Uses a walker", "Prefers lunch before afternoon activities"] },
       { id: "evelyn-demo", display_name: "Evelyn", age: 81, care_plan_version: "v3", support_setting: "Assisted living · morning visit", headline: evelynResolved ? "Verification exception resolved" : "Visit verification needs investigation", status: evelynResolved ? "resolved" : step === 0 ? "attention" : "waiting_on_human", preferences: ["Quiet morning routine", "Daughter receives schedule updates"], context: ["Morning support visit", "Attendance evidence is operational, not clinical"] }
     ],
     attention_queue: attention,
@@ -644,23 +647,33 @@ async function prepareAssignmentOrientation(db: D1Database, runId: string, body:
   const resident = resolveTeamResidentRef(state, parsed.data.resident_ref);
   if (resident !== "walter-demo" || parsed.data.caregiver_id !== "caregiver-elena") return json({ error: "This simulation only permits Walter's orientation packet for Elena." }, 409);
   const duplicate = await db.prepare("SELECT * FROM care_demo_orientation_packets WHERE run_id = ? AND idempotency_key = ?").bind(runId, parsed.data.idempotency_key).first<DbOrientationPacket>();
-  if (duplicate) return json({ packet: publicOrientationPacket(duplicate), acknowledgement_required: duplicate.status !== "acknowledged", external_side_effect: false, idempotent_replay: true });
+  if (duplicate) return json({ packet: publicOrientationPacket(duplicate), coordinator_follow_up_required: duplicate.status !== "verified", external_side_effect: false, idempotent_replay: true });
   const packetId = `orient_${crypto.randomUUID()}`;
-  await db.prepare("INSERT INTO care_demo_orientation_packets (run_id, packet_id, resident_id, caregiver_id, care_plan_version, status, reason, idempotency_key, created_at, acknowledged_at) VALUES (?, ?, 'walter-demo', 'caregiver-elena', 'v2', 'awaiting_caregiver_acknowledgement', ?, ?, ?, NULL)").bind(runId, packetId, parsed.data.reason, parsed.data.idempotency_key, state.resident.simulated_time).run();
+  await db.prepare("INSERT INTO care_demo_orientation_packets (run_id, packet_id, resident_id, caregiver_id, care_plan_version, status, reason, idempotency_key, created_at, response_detail, responded_at, verified_at) VALUES (?, ?, 'walter-demo', 'caregiver-elena', 'v2', 'awaiting_coordinator_outreach', ?, ?, ?, NULL, NULL, NULL)").bind(runId, packetId, parsed.data.reason, parsed.data.idempotency_key, state.resident.simulated_time).run();
   const packet = await db.prepare("SELECT * FROM care_demo_orientation_packets WHERE run_id = ? AND packet_id = ?").bind(runId, packetId).first<DbOrientationPacket>();
-  return json({ packet: publicOrientationPacket(packet!), acknowledgement_required: true, external_side_effect: false, boundary: "The agent prepared the packet; only Elena can acknowledge completion in the visible interface." });
+  return json({ packet: publicOrientationPacket(packet!), coordinator_follow_up_required: true, external_side_effect: false, boundary: "The agent prepared Walter’s packet and a readiness follow-up. A coordinator must send it, review Elena’s response, and verify receipt." });
 }
 
-async function acknowledgeAssignmentOrientation(db: D1Database, runId: string, packetId: string) {
+async function sendAssignmentOrientationFollowUp(db: D1Database, runId: string, packetId: string) {
   const run = await db.prepare("SELECT * FROM care_demo_runs WHERE run_id = ?").bind(runId).first<DbRun>();
   if (!run || run.scenario !== "care_team_day") return json({ error: "Care Team Day is not active." }, 409);
-  const updated = await db.prepare("UPDATE care_demo_orientation_packets SET status = 'acknowledged', acknowledged_at = ? WHERE run_id = ? AND packet_id = ? AND status = 'awaiting_caregiver_acknowledgement'").bind(run.simulated_time, runId, packetId).run();
+  const response = "I have Walter’s packet. I reviewed Care Plan v2 and submitted my acknowledgement. Can you verify that you see it?";
+  const updated = await db.prepare("UPDATE care_demo_orientation_packets SET status = 'response_received', response_detail = ?, responded_at = ? WHERE run_id = ? AND packet_id = ? AND status = 'awaiting_coordinator_outreach'").bind(response, run.simulated_time, runId, packetId).run();
   if ((updated.meta.changes ?? 0) !== 1) {
-    const existing = await db.prepare("SELECT packet_id FROM care_demo_orientation_packets WHERE run_id = ? AND packet_id = ?").bind(runId, packetId).first<{ packet_id: string }>();
-    return existing ? json({ state: await loadCareState(db, runId), already_acknowledged: true, external_side_effect: false }) : json({ error: "Orientation packet not found." }, 404);
+    const existing = await db.prepare("SELECT status FROM care_demo_orientation_packets WHERE run_id = ? AND packet_id = ?").bind(runId, packetId).first<{ status: string }>();
+    return existing ? json({ state: await loadCareState(db, runId), already_sent: true, external_side_effect: false }) : json({ error: "Orientation packet not found." }, 404);
   }
   await versionBump(db, runId, run.simulated_time).run();
-  return json({ state: await loadCareState(db, runId), acknowledged_by: "caregiver-elena", human_acknowledgement_recorded: true, external_side_effect: false });
+  return json({ state: await loadCareState(db, runId), simulated_response_received: true, evidence_class: "caregiver_self_report", external_side_effect: false });
+}
+
+async function verifyAssignmentOrientation(db: D1Database, runId: string, packetId: string) {
+  const run = await db.prepare("SELECT * FROM care_demo_runs WHERE run_id = ?").bind(runId).first<DbRun>();
+  if (!run || run.scenario !== "care_team_day") return json({ error: "Care Team Day is not active." }, 409);
+  const updated = await db.prepare("UPDATE care_demo_orientation_packets SET status = 'verified', verified_at = ? WHERE run_id = ? AND packet_id = ? AND status = 'response_received'").bind(run.simulated_time, runId, packetId).run();
+  if ((updated.meta.changes ?? 0) !== 1) return json({ error: "Elena’s submitted acknowledgement must be received before verification." }, 409);
+  await versionBump(db, runId, run.simulated_time).run();
+  return json({ state: await loadCareState(db, runId), verified_by: "scheduling_coordinator", permission_to_proceed_recorded: true, external_side_effect: false });
 }
 
 async function validateScheduleSnapshot(db: D1Database, runId: string, shiftId: string, snapshotId: string) {
@@ -1047,8 +1060,10 @@ export async function handleApi(request: Request, env: Env) {
   if (request.method === "POST" && teamInquiryCloseMatch) return closeTeamInquiry(env.DB, runId, decodeURIComponent(teamInquiryCloseMatch[1]));
   if (request.method === "POST" && path === "/api/care/team-day/advance") return advanceCareTeamDay(env.DB, runId);
   if (request.method === "POST" && path === "/api/care/orientation-packets") return prepareAssignmentOrientation(env.DB, runId, await readJson(request));
-  const orientationAcknowledgeMatch = path.match(/^\/api\/care\/orientation-packets\/([^/]+)\/acknowledge$/);
-  if (request.method === "POST" && orientationAcknowledgeMatch) return acknowledgeAssignmentOrientation(env.DB, runId, decodeURIComponent(orientationAcknowledgeMatch[1]));
+  const orientationFollowUpMatch = path.match(/^\/api\/care\/orientation-packets\/([^/]+)\/follow-up$/);
+  if (request.method === "POST" && orientationFollowUpMatch) return sendAssignmentOrientationFollowUp(env.DB, runId, decodeURIComponent(orientationFollowUpMatch[1]));
+  const orientationVerifyMatch = path.match(/^\/api\/care\/orientation-packets\/([^/]+)\/verify$/);
+  if (request.method === "POST" && orientationVerifyMatch) return verifyAssignmentOrientation(env.DB, runId, decodeURIComponent(orientationVerifyMatch[1]));
   if (request.method === "POST" && path === "/api/care/shift-context") return createShiftContext(env.DB, runId, await readJson(request));
   if (request.method === "POST" && path === "/api/care/coverage-candidates") return getCoverageCandidates(env.DB, runId, await readJson(request));
   if (request.method === "POST" && path === "/api/care/coverage-proposals") return prepareShiftCoverage(env.DB, runId, await readJson(request));
