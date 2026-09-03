@@ -195,8 +195,8 @@ proof of medication ingestion.
 - **Countries of residence:** United States is saved for both team members.
 - **Team membership:** Sam Tate still needs to join the project and confirm the
   invitation before final submission.
-- **Screenshots/thumbnail:** optional project media remains available to add if
-  desired.
+- **Thumbnail:** added from the verified public build; additional gallery
+  screenshots remain optional.
 - **Codex session ID:** add only if the final Devpost form requests one.
 - **Final submission:** intentionally not performed; it requires the user's
   explicit approval after the remaining eligibility and team checks.
